@@ -1,0 +1,28 @@
+# Python 字节码
+__pycache__/
+*.py[cod]
+*.pyo
+
+# 虚拟环境
+.venv/
+venv/
+env/
+
+# 环境变量文件（保留 .env.example）
+.env
+
+# IDE 配置
+.idea/
+.vscode/
+*.swp
+
+# uv 产物（uv.lock 应提交到版本库）
+.uv/
+
+# 测试产物
+.coverage
+htmlcov/
+.pytest_cache/
+
+# mypy 缓存
+.mypy_cache/
