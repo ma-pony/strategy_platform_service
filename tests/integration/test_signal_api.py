@@ -297,3 +297,62 @@ class TestSignalListEndpoint:
         item = response.json()["data"]["signals"][0]
         assert "direction" in item
         assert "signal_at" in item
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 任务 7.1：空缓存保护验证（需求 4.1, 4.4）
+# 任务 7.2：P95 性能测试占位（需求 4.5）
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+class TestSignalEmptyCacheProtection:
+    """任务 7.1：空缓存场景 → 返回空列表 + code:0，而非 HTTP 500（需求 4.4）。"""
+
+    @pytest.mark.asyncio
+    async def test_empty_cache_returns_empty_list_with_code_0(
+        self, client: AsyncClient, app
+    ) -> None:
+        """信号缓存为空时 → HTTP 200 + code:0 + 空 signals 列表，而非 HTTP 500。
+
+        需求 4.4：若信号缓存中不存在指定策略和交易对的数据，系统返回空列表而非 500 错误。
+        需求 4.1：信号接口正常返回 HTTP 200。
+        """
+        from src.core.deps import get_db
+
+        mock_db = _make_mock_db()
+        last_updated = datetime(2024, 1, 1, 12, 0, tzinfo=timezone.utc)
+
+        async def override_get_db():
+            yield mock_db
+
+        with patch(
+            "src.api.signals._signal_service.get_signals",
+            new_callable=AsyncMock,
+            return_value=([], last_updated),  # 空缓存：signals 列表为空
+        ):
+            app.dependency_overrides[get_db] = override_get_db
+            try:
+                response = await client.get("/api/v1/strategies/1/signals")
+            finally:
+                app.dependency_overrides.clear()
+
+        # 不应返回 500
+        assert response.status_code == 200
+        body = response.json()
+        assert body["code"] == 0
+        assert "data" in body
+        assert body["data"]["signals"] == []
+
+
+class TestSignalPerformancePlaceholder:
+    """任务 7.2：信号 P95 响应时间性能测试占位（需求 4.5）。"""
+
+    @pytest.mark.skip(reason="性能测试延后，待 pytest-benchmark / Locust 方案确定后实现")
+    async def test_signal_p95_response_time_under_500ms(self) -> None:
+        """P95 响应时间应不超过 500ms（信号数据来自缓存，非实时计算）。
+
+        需求 4.5：信号接口响应时间满足性能要求。
+        延后原因：需要 pytest-benchmark 或 Locust/k6 等性能测试工具，
+        当前 CI 环境未配置，待专项性能测试方案确定后实现。
+        """
+        pass

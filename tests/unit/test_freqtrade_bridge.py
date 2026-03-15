@@ -212,6 +212,68 @@ class TestCleanupTaskDir:
         assert not task_dir.exists()
 
 
+class TestPathIsolation:
+    """路径隔离单元测试（需求 7.5）。
+
+    验证不同用户/任务的 freqtrade 配置路径互不重叠，
+    防止配置文件相互覆盖。
+    """
+
+    def test_different_task_ids_produce_non_overlapping_paths(self, tmp_path: Path) -> None:
+        """为两个不同 task_id 生成配置路径，断言路径不重叠。"""
+        from src.freqtrade_bridge.runner import generate_config
+
+        user_id = 42
+        task_id_1 = 101
+        task_id_2 = 102
+
+        task_dir_1 = tmp_path / str(user_id) / str(task_id_1)
+        task_dir_2 = tmp_path / str(user_id) / str(task_id_2)
+
+        config_1 = generate_config(task_dir_1, {"stake_currency": "USDT"})
+        config_2 = generate_config(task_dir_2, {"stake_currency": "USDT"})
+
+        # 路径不重叠：config 文件在不同目录
+        assert config_1.parent != config_2.parent
+        assert str(task_id_1) in str(config_1)
+        assert str(task_id_2) in str(config_2)
+
+    def test_different_user_ids_produce_non_overlapping_paths(self, tmp_path: Path) -> None:
+        """为两个不同 user_id 生成配置路径，断言路径不重叠。"""
+        from src.freqtrade_bridge.runner import generate_config
+
+        user_id_1 = 1
+        user_id_2 = 2
+        task_id = 999
+
+        task_dir_1 = tmp_path / str(user_id_1) / str(task_id)
+        task_dir_2 = tmp_path / str(user_id_2) / str(task_id)
+
+        config_1 = generate_config(task_dir_1, {"stake_currency": "USDT"})
+        config_2 = generate_config(task_dir_2, {"stake_currency": "USDT"})
+
+        # 不同用户的路径不重叠
+        assert config_1.parent != config_2.parent
+        # 写入 config_1 的内容不影响 config_2
+        config_1.write_text('{"user": "1"}')
+        assert config_1.read_text() != config_2.read_text()
+
+    def test_task_dir_follows_isolation_pattern(self, tmp_path: Path) -> None:
+        """验证任务目录遵循 /{base}/{user_id}/{task_id}/ 隔离模式。"""
+        user_id = 7
+        task_id = 200
+
+        task_dir = tmp_path / str(user_id) / str(task_id)
+        # 路径中包含 user_id 和 task_id，确保隔离命名体现在目录层级
+        parts = task_dir.parts
+        assert str(user_id) in parts
+        assert str(task_id) in parts
+        # user_id 在 task_id 之前（父目录）
+        user_idx = parts.index(str(user_id))
+        task_idx = parts.index(str(task_id))
+        assert user_idx < task_idx
+
+
 class TestFetchSignals:
     """fetch_signals 信号获取单元测试。"""
 

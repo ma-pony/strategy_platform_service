@@ -362,3 +362,185 @@ class TestReportDetailEndpoint:
         assert response.status_code == 200
         data = response.json()["data"]
         assert set(data["related_coins"]) == {"BTC", "ETH"}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 任务 8.1：新增研报 API 集成测试（需求 5.1, 5.2, 5.3, 5.4, 5.5）
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+class TestReportTask8:
+    """任务 8.1：补充研报接口统一信封格式与分页结构显式验证用例。"""
+
+    @pytest.mark.asyncio
+    async def test_anonymous_list_access_returns_200_with_code_0(
+        self, client: AsyncClient, app
+    ) -> None:
+        """匿名用户（无 Authorization header）访问研报列表 → HTTP 200 + code:0。
+
+        需求 5.1：匿名用户可访问研报列表，无需认证。
+        """
+        from src.core.deps import get_db
+
+        mock_db = _make_mock_db()
+
+        async def override_get_db():
+            yield mock_db
+
+        with patch(
+            "src.api.reports._report_service.list_reports",
+            new_callable=AsyncMock,
+            return_value=([], 0),
+        ):
+            app.dependency_overrides[get_db] = override_get_db
+            try:
+                # 不携带 Authorization header
+                response = await client.get("/api/v1/reports")
+            finally:
+                app.dependency_overrides.clear()
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["code"] == 0
+
+    @pytest.mark.asyncio
+    async def test_anonymous_detail_access_returns_full_content(
+        self, client: AsyncClient, app
+    ) -> None:
+        """匿名用户访问研报详情 → 返回完整内容（含 content 字段），无需登录。
+
+        需求 5.2：研报详情接口无需认证，返回完整研报内容。
+        """
+        from src.core.deps import get_db
+
+        report = _make_mock_report(id=5, content="完整市场分析：详细数据与趋势预测。")
+        mock_db = _make_mock_db()
+
+        async def override_get_db():
+            yield mock_db
+
+        with patch(
+            "src.api.reports._report_service.get_report",
+            new_callable=AsyncMock,
+            return_value=report,
+        ):
+            app.dependency_overrides[get_db] = override_get_db
+            try:
+                response = await client.get("/api/v1/reports/5")
+            finally:
+                app.dependency_overrides.clear()
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["code"] == 0
+        # 返回完整内容（content 字段存在）
+        assert "content" in body["data"]
+        assert body["data"]["content"] == "完整市场分析：详细数据与趋势预测。"
+
+    @pytest.mark.asyncio
+    async def test_nonexistent_report_id_returns_404_not_500(
+        self, client: AsyncClient, app
+    ) -> None:
+        """请求不存在的研报 ID → HTTP 404 + 业务错误码，而非 HTTP 500。
+
+        需求 5.3：不存在的研报 ID 返回适当错误码（非 500），HTTP 状态码为 404。
+        """
+        from src.core.deps import get_db
+        from src.core.exceptions import NotFoundError
+
+        mock_db = _make_mock_db()
+
+        async def override_get_db():
+            yield mock_db
+
+        with patch(
+            "src.api.reports._report_service.get_report",
+            new_callable=AsyncMock,
+            side_effect=NotFoundError("研报 99999 不存在"),
+        ):
+            app.dependency_overrides[get_db] = override_get_db
+            try:
+                response = await client.get("/api/v1/reports/99999")
+            finally:
+                app.dependency_overrides.clear()
+
+        # 必须是 404，不能是 500
+        assert response.status_code == 404
+        assert response.status_code != 500
+        body = response.json()
+        assert body["code"] == 3001
+
+    @pytest.mark.asyncio
+    async def test_pagination_structure_has_required_fields(
+        self, client: AsyncClient, app
+    ) -> None:
+        """研报列表响应 data 包含 items、total、page、page_size 四个字段。
+
+        需求 5.4：研报列表接口返回标准分页结构，与其他列表接口保持一致。
+        """
+        from src.core.deps import get_db
+
+        reports = [_make_mock_report(id=i) for i in range(1, 4)]
+        mock_db = _make_mock_db()
+
+        async def override_get_db():
+            yield mock_db
+
+        with patch(
+            "src.api.reports._report_service.list_reports",
+            new_callable=AsyncMock,
+            return_value=(reports, 3),
+        ):
+            app.dependency_overrides[get_db] = override_get_db
+            try:
+                response = await client.get("/api/v1/reports?page=1&page_size=10")
+            finally:
+                app.dependency_overrides.clear()
+
+        assert response.status_code == 200
+        data = response.json()["data"]
+        # 四个必须字段
+        assert "items" in data
+        assert "total" in data
+        assert "page" in data
+        assert "page_size" in data
+        # 验证值
+        assert data["total"] == 3
+        assert data["page"] == 1
+        assert data["page_size"] == 10
+        assert len(data["items"]) == 3
+
+    @pytest.mark.asyncio
+    async def test_envelope_format_has_code_message_data_fields(
+        self, client: AsyncClient, app
+    ) -> None:
+        """研报接口响应体包含 code、message、data 三个字段。
+
+        需求 5.5：研报接口响应符合统一信封格式（code、message、data 三字段齐全）。
+        """
+        from src.core.deps import get_db
+
+        mock_db = _make_mock_db()
+
+        async def override_get_db():
+            yield mock_db
+
+        with patch(
+            "src.api.reports._report_service.list_reports",
+            new_callable=AsyncMock,
+            return_value=([], 0),
+        ):
+            app.dependency_overrides[get_db] = override_get_db
+            try:
+                response = await client.get("/api/v1/reports")
+            finally:
+                app.dependency_overrides.clear()
+
+        assert response.status_code == 200
+        body = response.json()
+        # 三字段齐全
+        assert "code" in body
+        assert "message" in body
+        assert "data" in body
+        assert body["code"] == 0
+        assert body["message"] is not None

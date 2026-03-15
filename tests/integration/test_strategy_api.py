@@ -286,6 +286,31 @@ class TestStrategyDetailEndpoint:
         assert item.get("win_rate") is None
 
     @pytest.mark.asyncio
+    async def test_page_size_over_limit_returns_422_code_2001(
+        self, client: AsyncClient, app
+    ) -> None:
+        """传入 page_size=200（超过最大值 100）时，验证 HTTP 422 + code:2001（需求 2.5）。
+
+        行为为返回校验错误，而非静默截断至最大值 100。
+        """
+        from src.core.deps import get_db
+
+        mock_db = _make_mock_db()
+
+        async def override_get_db():
+            yield mock_db
+
+        app.dependency_overrides[get_db] = override_get_db
+        try:
+            response = await client.get("/api/v1/strategies?page_size=200")
+        finally:
+            app.dependency_overrides.clear()
+
+        assert response.status_code == 422
+        body = response.json()
+        assert body["code"] == 2001
+
+    @pytest.mark.asyncio
     async def test_vip_user_sees_all_fields(
         self, client: AsyncClient, app
     ) -> None:
@@ -329,3 +354,92 @@ class TestStrategyDetailEndpoint:
         assert item["win_rate"] == pytest.approx(0.65)
         assert item["trade_count"] == 100
         assert item["max_drawdown"] == pytest.approx(0.12)
+
+    @pytest.mark.asyncio
+    async def test_vip2_user_sees_all_advanced_fields(
+        self, client: AsyncClient, app
+    ) -> None:
+        """VIP2 用户访问策略详情，所有高级指标字段均可见（需求 2.3）。"""
+        from src.core.deps import get_db, get_optional_user
+        from src.core.enums import MembershipTier
+
+        strategy = _make_mock_strategy()
+        strategy.sharpe_ratio = 3.1
+        strategy.win_rate = 0.70
+        strategy.trade_count = 200
+        strategy.max_drawdown = 0.08
+
+        mock_vip2_user = MagicMock()
+        mock_vip2_user.membership = MembershipTier.VIP2
+        mock_vip2_user.is_active = True
+
+        mock_db = _make_mock_db()
+
+        async def override_get_db():
+            yield mock_db
+
+        async def override_get_optional_user():
+            return mock_vip2_user
+
+        with patch(
+            "src.api.strategies._strategy_service.get_strategy",
+            new_callable=AsyncMock,
+            return_value=strategy,
+        ):
+            app.dependency_overrides[get_db] = override_get_db
+            app.dependency_overrides[get_optional_user] = override_get_optional_user
+            try:
+                response = await client.get("/api/v1/strategies/1")
+            finally:
+                app.dependency_overrides.clear()
+
+        assert response.status_code == 200
+        item = response.json()["data"]
+        assert item["sharpe_ratio"] == pytest.approx(3.1)
+        assert item["win_rate"] == pytest.approx(0.70)
+        assert item["trade_count"] == 200
+        assert item["max_drawdown"] == pytest.approx(0.08)
+
+
+class TestStrategyListDefaultPagination:
+    """策略列表默认分页参数验证（需求 2.4）。"""
+
+    @pytest.mark.asyncio
+    async def test_no_pagination_params_defaults_to_page1_size20(
+        self, client: AsyncClient, app
+    ) -> None:
+        """不传分页参数时，接口默认返回第 1 页每页 20 条，响应含 items/total/page/page_size（需求 2.4）。"""
+        from src.core.deps import get_db
+
+        strategies = [_make_mock_strategy(id=i, name=f"Strategy {i}") for i in range(1, 6)]
+        mock_db = _make_mock_db()
+
+        async def override_get_db():
+            yield mock_db
+
+        with patch(
+            "src.api.strategies._strategy_service.list_strategies",
+            new_callable=AsyncMock,
+            return_value=(strategies, 5),
+        ):
+            app.dependency_overrides[get_db] = override_get_db
+            try:
+                # 不传任何分页参数
+                response = await client.get("/api/v1/strategies")
+            finally:
+                app.dependency_overrides.clear()
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["code"] == 0
+        data = body["data"]
+        # 响应体必须包含分页字段
+        assert "items" in data
+        assert "total" in data
+        assert "page" in data
+        assert "page_size" in data
+        # 默认分页值
+        assert data["page"] == 1
+        assert data["page_size"] == 20
+        assert data["total"] == 5
+        assert len(data["items"]) == 5

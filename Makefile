@@ -7,7 +7,7 @@ run:
 	uv run python -m src.main
 
 test:
-	uv run pytest
+	uv run pytest --tb=short
 
 lint:
 	uv run ruff check src/ tests/

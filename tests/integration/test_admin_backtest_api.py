@@ -234,3 +234,138 @@ class TestAdminBacktestList:
         assert data["code"] == 0
         assert data["data"]["total"] == 3
         assert len(data["data"]["items"]) == 3
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 任务 5.1：新增权限与状态测试用例（需求 3.1, 3.2, 3.5, 3.6, 3.7）
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+@pytest.fixture()
+async def bare_client(app) -> AsyncGenerator[AsyncClient, None]:
+    """未覆盖任何认证依赖的原始客户端（用于测试匿名访问）。"""
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as ac:
+        yield ac
+
+
+class TestAdminBacktestTask5:
+    """任务 5.1 新增测试用例：权限控制、冲突、Not Found 及状态查询。"""
+
+    @pytest.mark.asyncio
+    async def test_admin_submit_returns_task_id_and_pending_status(
+        self, admin_client: AsyncClient
+    ) -> None:
+        """管理员提交回测 → mock 返回 PENDING 任务 → 响应包含 task_id 和 status:pending。
+
+        注：当前路由返回 HTTP 200（非 202），此为已知行为差异，记录于设计文档。
+        需求 3.1 要求 task_id 和初始状态 PENDING，均通过此用例验证。
+        """
+        mock_task = _make_mock_task(id=42, status=TaskStatus.PENDING)
+
+        with patch(
+            "src.services.admin_backtest_service.AdminBacktestService.submit_backtest",
+            new_callable=AsyncMock,
+            return_value=mock_task,
+        ):
+            resp = await admin_client.post(
+                "/api/v1/admin/backtests",
+                json={"strategy_id": 1, "timerange": "20240101-20240301"},
+            )
+
+        assert resp.status_code == 200  # 当前路由实际返回 200
+        body = resp.json()
+        assert body["code"] == 0
+        assert body["data"]["id"] == 42
+        assert body["data"]["status"] == "pending"
+
+    @pytest.mark.asyncio
+    async def test_anonymous_user_returns_401_on_backtest_submit(
+        self, bare_client: AsyncClient
+    ) -> None:
+        """匿名用户（无 Authorization header）提交回测 → HTTP 401 + code:1001。
+
+        需求 3.6：匿名用户调用回测接口，系统返回业务错误码 1001，拒绝创建任务。
+        """
+        resp = await bare_client.post(
+            "/api/v1/admin/backtests",
+            json={"strategy_id": 1, "timerange": "20240101-20240301"},
+        )
+
+        assert resp.status_code == 401
+        body = resp.json()
+        assert body["code"] == 1001
+
+    @pytest.mark.asyncio
+    async def test_running_task_conflict_returns_409_with_code_3002(
+        self, admin_client: AsyncClient
+    ) -> None:
+        """重复提交 RUNNING 任务 → mock 抛出 ConflictError → HTTP 409 + code:3002。
+
+        需求 3.5：已有任务处于 RUNNING 状态时，返回业务错误码 3002（回测任务冲突）。
+        """
+        from src.core.exceptions import ConflictError
+
+        with patch(
+            "src.services.admin_backtest_service.AdminBacktestService.submit_backtest",
+            new_callable=AsyncMock,
+            side_effect=ConflictError("已有 RUNNING 任务，禁止重复提交"),
+        ):
+            resp = await admin_client.post(
+                "/api/v1/admin/backtests",
+                json={"strategy_id": 1, "timerange": "20240101-20240301"},
+            )
+
+        assert resp.status_code == 409
+        body = resp.json()
+        assert body["code"] == 3002
+
+    @pytest.mark.asyncio
+    async def test_strategy_not_found_returns_404_with_code_3001(
+        self, admin_client: AsyncClient
+    ) -> None:
+        """策略不存在 → mock 抛出 NotFoundError → HTTP 404 + code:3001。
+
+        需求 3.1 错误路径：提交指向不存在策略的回测时，返回 3001。
+        """
+        from src.core.exceptions import NotFoundError
+
+        with patch(
+            "src.services.admin_backtest_service.AdminBacktestService.submit_backtest",
+            new_callable=AsyncMock,
+            side_effect=NotFoundError("策略 9999 不存在"),
+        ):
+            resp = await admin_client.post(
+                "/api/v1/admin/backtests",
+                json={"strategy_id": 9999, "timerange": "20240101-20240301"},
+            )
+
+        assert resp.status_code == 404
+        body = resp.json()
+        assert body["code"] == 3001
+
+    @pytest.mark.asyncio
+    async def test_running_status_query_returns_no_result_data(
+        self, admin_client: AsyncClient
+    ) -> None:
+        """RUNNING 状态任务查询 → 响应不含结果数据（result_summary 为 None）。
+
+        需求 3.2：任务处于 RUNNING 状态时，查询接口返回当前状态且不包含结果数据。
+        """
+        mock_task = _make_mock_task(id=10, status=TaskStatus.RUNNING)
+        # 确保 result_json 为 None（无结果数据）
+        mock_task.result_json = None
+
+        with patch(
+            "src.services.admin_backtest_service.AdminBacktestService.get_task",
+            new_callable=AsyncMock,
+            return_value=mock_task,
+        ):
+            resp = await admin_client.get("/api/v1/admin/backtests/10")
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["code"] == 0
+        assert body["data"]["status"] == "running"
+        assert body["data"]["result_summary"] is None
