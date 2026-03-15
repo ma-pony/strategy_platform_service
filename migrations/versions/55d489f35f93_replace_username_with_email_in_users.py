@@ -1,7 +1,8 @@
 """replace_username_with_email_in_users
 
 将 users 表的 username 字段替换为 email 字段。
-- upgrade(): 删除 idx_users_username 索引和 username 列，新增 email VARCHAR(254) UNIQUE NOT NULL 列和 idx_users_email 索引
+- upgrade(): 删除 idx_users_username 索引和 username 列，
+  新增 email VARCHAR(254) UNIQUE NOT NULL 列和 idx_users_email 索引
 - downgrade(): 逆向还原 username VARCHAR(64) UNIQUE NOT NULL 列和原索引
 
 Revision ID: 55d489f35f93
@@ -10,7 +11,8 @@ Create Date: 2026-03-15
 
 """
 
-from typing import Sequence, Union
+from collections.abc import Sequence
+from typing import Union
 
 import sqlalchemy as sa
 from alembic import op

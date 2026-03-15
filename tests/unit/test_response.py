@@ -5,7 +5,6 @@
 """
 
 
-
 class TestApiResponse:
     """ApiResponse 泛型模型测试。"""
 

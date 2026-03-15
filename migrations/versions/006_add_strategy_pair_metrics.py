@@ -11,7 +11,8 @@ Create Date: 2026-03-15
 Requirements: 1.1, 1.2, 1.3, 1.4, 1.5
 """
 
-from typing import Sequence, Union
+from collections.abc import Sequence
+from typing import Union
 
 import sqlalchemy as sa
 from alembic import op

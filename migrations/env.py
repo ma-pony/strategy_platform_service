@@ -6,13 +6,11 @@ target_metadata 指向 Base.metadata，支持 autogenerate。
 
 from logging.config import fileConfig
 
-from sqlalchemy import engine_from_config, pool
-
 from alembic import context
+from sqlalchemy import engine_from_config, pool
 
 # 导入所有模型以注册到 Base.metadata
 import src.models  # noqa: F401 - 触发所有模型注册
-
 from src.models.base import Base
 
 # this is the Alembic Config object, which provides

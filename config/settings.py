@@ -1,4 +1,5 @@
 """多环境配置加载模块。"""
+
 import os
 from functools import lru_cache
 from typing import Literal, Union
@@ -57,8 +58,7 @@ def settings_factory() -> Settings:
     env = os.environ.get("APP_ENV", "development")
     if env == "production":
         return ProdSettings()
-    elif env == "test":
+    if env == "test":
         return TestSettings()
-    else:
-        # development 或未知值均通过 Pydantic 校验捕获
-        return DevSettings(app_env=env)  # type: ignore[arg-type]
+    # development 或未知值均通过 Pydantic 校验捕获
+    return DevSettings(app_env=env)  # type: ignore[arg-type]

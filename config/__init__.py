@@ -1,4 +1,5 @@
 """配置包，导出 settings_factory 和 Settings 类型。"""
+
 from config.settings import (
     AppEnv,
     BaseAppSettings,

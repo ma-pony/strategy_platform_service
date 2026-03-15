@@ -14,7 +14,6 @@
 """
 
 
-
 class TestStrategyPairMetricsAdminExists:
     """StrategyPairMetricsAdmin 类存在性验证（需求 5.1）。"""
 

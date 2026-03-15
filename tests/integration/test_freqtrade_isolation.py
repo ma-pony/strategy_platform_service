@@ -180,7 +180,6 @@ class TestFreqtradeWorkerIsolation:
         mock_result.scalars.return_value.all.return_value = [mock_strategy]
         mock_db_session.execute = AsyncMock(return_value=mock_result)
 
-
         # 模拟 freqtrade 子进程不可用
         with patch(
             "subprocess.run",

@@ -14,7 +14,6 @@ class Base(DeclarativeBase):
     """所有 SQLAlchemy 模型的基类。"""
 
 
-
 class TimestampMixin:
     """自动维护 created_at 和 updated_at 字段的 Mixin。
 

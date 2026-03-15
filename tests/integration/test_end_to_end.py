@@ -266,7 +266,6 @@ class TestDisabledUserBlocked:
         # 由于现有路由都使用 get_optional_user，我们直接验证 get_current_user 行为
         from src.core.deps import get_current_user
 
-
         async def override_get_current_user_disabled():
             from src.core.exceptions import AuthenticationError
 

@@ -7,7 +7,8 @@ Revises: 001
 Create Date: 2026-03-14
 """
 
-from typing import Sequence, Union
+from collections.abc import Sequence
+from typing import Union
 
 import sqlalchemy as sa
 from alembic import op
@@ -61,9 +62,7 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("name"),
     )
-    op.create_index(
-        "idx_strategies_is_active", "strategies", ["is_active"], unique=False
-    )
+    op.create_index("idx_strategies_is_active", "strategies", ["is_active"], unique=False)
 
 
 def downgrade() -> None:
