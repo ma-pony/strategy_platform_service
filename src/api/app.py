@@ -94,6 +94,7 @@ def create_app_with_lifespan() -> FastAPI:
 def _register_routers(app: FastAPI) -> None:
     """注册所有 API 路由至 /api/v1 前缀。"""
     from src.api.admin_backtests import router as admin_backtests_router
+    from src.api.admin_reports import router as admin_reports_router
     from src.api.auth import router as auth_router
     from src.api.backtests import router as backtests_router
     from src.api.health import router as health_router
@@ -111,4 +112,5 @@ def _register_routers(app: FastAPI) -> None:
     app.include_router(signals_router, prefix=api_v1_prefix)
     app.include_router(reports_router, prefix=api_v1_prefix)
     app.include_router(admin_backtests_router, prefix=api_v1_prefix)
+    app.include_router(admin_reports_router, prefix=api_v1_prefix)
     app.include_router(pair_metrics_router, prefix=api_v1_prefix)

@@ -103,6 +103,7 @@ known-first-party = ["src"]
 "src/freqtrade_bridge/seeds/**/*.py" = [
     "T20",    # 种子脚本允许 print
     "S608",   # SQL 拼接（清理数据时使用）
+    "E501",   # 种子数据中的长文本行
 ]
 "src/freqtrade_bridge/strategies/**/*.py" = [
     "N802",   # freqtrade 策略方法命名不遵循 PEP8
