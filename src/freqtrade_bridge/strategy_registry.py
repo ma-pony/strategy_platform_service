@@ -26,44 +26,44 @@ class StrategyRegistryEntry(TypedDict):
 
 # 全局常量：数据库 Strategy.name → StrategyRegistryEntry
 STRATEGY_REGISTRY: dict[str, StrategyRegistryEntry] = {
-    "TurtleTrading": StrategyRegistryEntry(
-        class_name="TurtleTrading",
+    "TurtleTradingStrategy": StrategyRegistryEntry(
+        class_name="TurtleTradingStrategy",
         file_path=_STRATEGIES_DIR / "turtle_trading.py",
     ),
-    "BollingerMeanReversion": StrategyRegistryEntry(
-        class_name="BollingerMeanReversion",
+    "BollingerBandMeanReversionStrategy": StrategyRegistryEntry(
+        class_name="BollingerBandMeanReversionStrategy",
         file_path=_STRATEGIES_DIR / "bollinger_mean_reversion.py",
     ),
-    "RsiMeanReversion": StrategyRegistryEntry(
-        class_name="RsiMeanReversion",
+    "RsiMeanReversionStrategy": StrategyRegistryEntry(
+        class_name="RsiMeanReversionStrategy",
         file_path=_STRATEGIES_DIR / "rsi_mean_reversion.py",
     ),
-    "MacdTrend": StrategyRegistryEntry(
-        class_name="MacdTrend",
+    "MacdTrendFollowingStrategy": StrategyRegistryEntry(
+        class_name="MacdTrendFollowingStrategy",
         file_path=_STRATEGIES_DIR / "macd_trend.py",
     ),
-    "IchimokuTrend": StrategyRegistryEntry(
-        class_name="IchimokuTrend",
+    "IchimokuCloudTrendStrategy": StrategyRegistryEntry(
+        class_name="IchimokuCloudTrendStrategy",
         file_path=_STRATEGIES_DIR / "ichimoku_trend.py",
     ),
-    "ParabolicSarTrend": StrategyRegistryEntry(
-        class_name="ParabolicSarTrend",
+    "ParabolicSarTrendStrategy": StrategyRegistryEntry(
+        class_name="ParabolicSarTrendStrategy",
         file_path=_STRATEGIES_DIR / "parabolic_sar_trend.py",
     ),
-    "KeltnerBreakout": StrategyRegistryEntry(
-        class_name="KeltnerBreakout",
+    "KeltnerChannelBreakoutStrategy": StrategyRegistryEntry(
+        class_name="KeltnerChannelBreakoutStrategy",
         file_path=_STRATEGIES_DIR / "keltner_breakout.py",
     ),
-    "AroonTrend": StrategyRegistryEntry(
-        class_name="AroonTrend",
+    "AroonTrendSystemStrategy": StrategyRegistryEntry(
+        class_name="AroonTrendSystemStrategy",
         file_path=_STRATEGIES_DIR / "aroon_trend.py",
     ),
-    "Nr7Breakout": StrategyRegistryEntry(
-        class_name="Nr7Breakout",
+    "Nr7VolatilityContractionBreakoutStrategy": StrategyRegistryEntry(
+        class_name="Nr7VolatilityContractionBreakoutStrategy",
         file_path=_STRATEGIES_DIR / "nr7_breakout.py",
     ),
-    "StochasticReversal": StrategyRegistryEntry(
-        class_name="StochasticReversal",
+    "StochasticOscillatorReversalStrategy": StrategyRegistryEntry(
+        class_name="StochasticOscillatorReversalStrategy",
         file_path=_STRATEGIES_DIR / "stochastic_reversal.py",
     ),
 }

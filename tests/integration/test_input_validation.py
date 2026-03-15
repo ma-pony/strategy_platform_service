@@ -68,7 +68,7 @@ class TestMissingRequiredField:
         """
         resp = await client.post(
             "/api/v1/auth/login",
-            json={"username": "testuser"},  # 缺少 password 字段
+            json={"email": "testuser@example.com"},  # 缺少 password 字段
         )
 
         assert resp.status_code == 422
@@ -98,7 +98,7 @@ class TestWrongTypeField:
         """
         resp = await client.post(
             "/api/v1/auth/login",
-            json={"username": "testuser", "password": 12345},  # password 应为字符串
+            json={"email": "testuser@example.com", "password": 12345},  # password 应为字符串
         )
 
         assert resp.status_code == 422
@@ -120,7 +120,7 @@ class TestRequestValidationErrorEnvelope:
         """
         resp = await client.post(
             "/api/v1/auth/login",
-            json={"username": "testuser"},  # 缺少 password，触发 RequestValidationError
+            json={"email": "testuser@example.com"},  # 缺少 password，触发 RequestValidationError
         )
 
         assert resp.status_code == 422
@@ -229,7 +229,7 @@ class TestErrorResponseEnvelopeFormat:
         from src.core.deps import get_current_user
 
         normal_user = SimpleNamespace(
-            id=2, username="user", membership="free", is_active=True, is_admin=False
+            id=2, email="user@example.com", membership="free", is_active=True, is_admin=False
         )
         app.dependency_overrides[get_current_user] = lambda: normal_user
         try:

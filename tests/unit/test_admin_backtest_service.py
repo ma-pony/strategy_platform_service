@@ -21,7 +21,7 @@ class TestAdminBacktestService:
         mock_db = AsyncMock()
 
         # Mock strategy 查询
-        mock_strategy = SimpleNamespace(id=1, name="TurtleTrading")
+        mock_strategy = SimpleNamespace(id=1, name="TurtleTradingStrategy")
         mock_db.get = AsyncMock(return_value=mock_strategy)
         mock_db.flush = AsyncMock()
         mock_db.commit = AsyncMock()
@@ -30,7 +30,7 @@ class TestAdminBacktestService:
         with patch("src.services.admin_backtest_service.lookup") as mock_lookup, \
              patch("src.workers.celery_app.celery_app") as mock_celery:
             mock_lookup.return_value = {
-                "class_name": "TurtleTrading",
+                "class_name": "TurtleTradingStrategy",
                 "file_path": MagicMock(exists=MagicMock(return_value=True)),
             }
 

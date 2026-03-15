@@ -143,41 +143,73 @@ def _extract_signal_from_df(df: Any, pair: str, timeframe: str = "1h") -> dict[s
 
     last_row = df.iloc[-1]
 
-    # 判断信号方向
+    # 判断信号方向（优先级：入场 > 出场，与 seed_signals 一致）
     enter_long = last_row.get("enter_long", 0)
     exit_long = last_row.get("exit_long", 0)
+    enter_short = last_row.get("enter_short", 0)
+    exit_short = last_row.get("exit_short", 0)
 
     if enter_long == 1:
         direction = "buy"
+    elif enter_short == 1:
+        direction = "sell"
     elif exit_long == 1:
         direction = "sell"
+    elif exit_short == 1:
+        direction = "buy"
     else:
         direction = "hold"
 
     close_price = float(last_row["close"])
     volume = float(last_row["volume"])
 
-    # 计算止损/止盈（基于 ATR 或固定比例）
+    # 计算止损/止盈（基于 ATR 或固定比例，区分方向）
     atr = last_row.get("atr", None)
     if atr is not None and not math.isnan(float(atr)):
         atr_val = float(atr)
-        stop_loss = close_price - 2.0 * atr_val
-        take_profit = close_price + 3.0 * atr_val
+        if direction == "buy":
+            stop_loss = close_price - 2.0 * atr_val
+            take_profit = close_price + 3.0 * atr_val
+        else:
+            stop_loss = close_price + 2.0 * atr_val
+            take_profit = close_price - 3.0 * atr_val
     else:
-        # 回退：固定百分比
-        stop_loss = close_price * 0.97
-        take_profit = close_price * 1.05
+        factor = 1 if direction == "buy" else -1
+        stop_loss = close_price * (1 - factor * 0.03)
+        take_profit = close_price * (1 + factor * 0.05)
 
-    # 计算置信度（基于信号强度）
+    # 信号强度与置信度
+    is_entry = enter_long == 1 or enter_short == 1
     if direction == "hold":
         confidence_score = 0.0
         signal_strength = 0.0
     else:
-        confidence_score = 0.75
-        signal_strength = 0.70
+        signal_strength = 0.75 if is_entry else 0.50
+        # 置信度：基于成交量确认 + 信号类型 + 波动稳定性
+        confidence_score = 0.50
+        volume_mean = last_row.get("volume_mean", None)
+        if volume_mean is not None and not math.isnan(float(volume_mean)) and float(volume_mean) > 0:
+            vol_ratio = volume / float(volume_mean)
+            if vol_ratio > 1.5:
+                confidence_score += 0.20
+            elif vol_ratio > 1.0:
+                confidence_score += 0.10
+        if is_entry:
+            confidence_score += 0.10
+        if atr is not None and not math.isnan(float(atr)):
+            atr_pct = float(atr) / close_price
+            if atr_pct < 0.02:
+                confidence_score += 0.10
+            elif atr_pct < 0.04:
+                confidence_score += 0.05
+        confidence_score = min(confidence_score, 0.95)
 
     # 收集技术指标快照（过滤掉 OHLCV 基础列和信号列，保留指标列）
-    _base_cols = {"date", "open", "high", "low", "close", "volume", "enter_long", "exit_long"}
+    _base_cols = {
+        "date", "open", "high", "low", "close", "volume",
+        "enter_long", "exit_long", "enter_short", "exit_short",
+        "enter_tag", "exit_tag",
+    }
     indicator_values: dict[str, Any] = {}
     for col in df.columns:
         if col in _base_cols:

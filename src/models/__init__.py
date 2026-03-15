@@ -9,6 +9,7 @@ from src.models.base import Base, TimestampMixin
 from src.models.report import ReportCoin, ResearchReport
 from src.models.signal import TradingSignal
 from src.models.strategy import Strategy
+from src.models.strategy_pair_metrics import StrategyPairMetrics
 from src.models.user import User
 
 __all__ = [
@@ -21,4 +22,5 @@ __all__ = [
     "TradingSignal",
     "ResearchReport",
     "ReportCoin",
+    "StrategyPairMetrics",
 ]

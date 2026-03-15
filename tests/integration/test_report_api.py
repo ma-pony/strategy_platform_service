@@ -544,3 +544,125 @@ class TestReportTask8:
         assert "data" in body
         assert body["code"] == 0
         assert body["message"] is not None
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Batch 2：补齐研报接口级别测试用例
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+class TestReportListValidation:
+    """GET /api/v1/reports 输入验证测试。"""
+
+    @pytest.mark.asyncio
+    async def test_page_size_exceeds_limit_returns_422(
+        self, client: AsyncClient
+    ) -> None:
+        """page_size=200（超过 100 上限）→ HTTP 422。"""
+        resp = await client.get("/api/v1/reports", params={"page_size": 200})
+        assert resp.status_code == 422
+
+    @pytest.mark.asyncio
+    async def test_page_zero_returns_422(
+        self, client: AsyncClient
+    ) -> None:
+        """page=0（小于最小值 1）→ HTTP 422。"""
+        resp = await client.get("/api/v1/reports", params={"page": 0})
+        assert resp.status_code == 422
+
+    @pytest.mark.asyncio
+    async def test_page_size_zero_returns_422(
+        self, client: AsyncClient
+    ) -> None:
+        """page_size=0（小于最小值 1）→ HTTP 422。"""
+        resp = await client.get("/api/v1/reports", params={"page_size": 0})
+        assert resp.status_code == 422
+
+    @pytest.mark.asyncio
+    async def test_negative_page_returns_422(
+        self, client: AsyncClient
+    ) -> None:
+        """page=-1（负数）→ HTTP 422。"""
+        resp = await client.get("/api/v1/reports", params={"page": -1})
+        assert resp.status_code == 422
+
+
+class TestReportDetailValidation:
+    """GET /api/v1/reports/{id} 输入验证测试。"""
+
+    @pytest.mark.asyncio
+    async def test_non_integer_report_id_returns_422(
+        self, client: AsyncClient
+    ) -> None:
+        """非整数 report_id（如 "abc"）→ HTTP 422。"""
+        resp = await client.get("/api/v1/reports/abc")
+        assert resp.status_code == 422
+
+    @pytest.mark.asyncio
+    async def test_float_report_id_returns_422(
+        self, client: AsyncClient
+    ) -> None:
+        """浮点数 report_id（如 "1.5"）→ HTTP 422。"""
+        resp = await client.get("/api/v1/reports/1.5")
+        assert resp.status_code == 422
+
+    @pytest.mark.asyncio
+    async def test_logged_in_user_can_access_report_detail(
+        self, client: AsyncClient, app
+    ) -> None:
+        """已登录用户访问研报详情 → 正常返回 200（不因多余的 token 报错）。"""
+        from src.core.deps import get_db
+
+        report = _make_mock_report(id=1)
+        mock_db = _make_mock_db()
+
+        async def override_get_db():
+            yield mock_db
+
+        with patch(
+            "src.api.reports._report_service.get_report",
+            new_callable=AsyncMock,
+            return_value=report,
+        ):
+            app.dependency_overrides[get_db] = override_get_db
+            try:
+                # 携带 Authorization header（模拟已登录用户）
+                response = await client.get(
+                    "/api/v1/reports/1",
+                    headers={"Authorization": "Bearer some-token"},
+                )
+            finally:
+                app.dependency_overrides.clear()
+
+        # 研报接口不做鉴权，即使携带 token 也应正常返回
+        assert response.status_code == 200
+        assert response.json()["code"] == 0
+
+    @pytest.mark.asyncio
+    async def test_logged_in_user_can_access_report_list(
+        self, client: AsyncClient, app
+    ) -> None:
+        """已登录用户访问研报列表 → 正常返回 200。"""
+        from src.core.deps import get_db
+
+        mock_db = _make_mock_db()
+
+        async def override_get_db():
+            yield mock_db
+
+        with patch(
+            "src.api.reports._report_service.list_reports",
+            new_callable=AsyncMock,
+            return_value=([], 0),
+        ):
+            app.dependency_overrides[get_db] = override_get_db
+            try:
+                response = await client.get(
+                    "/api/v1/reports",
+                    headers={"Authorization": "Bearer some-token"},
+                )
+            finally:
+                app.dependency_overrides.clear()
+
+        assert response.status_code == 200
+        assert response.json()["code"] == 0

@@ -1,9 +1,14 @@
-"""认证服务单元测试（任务 3.1 / 13.3）。
+"""认证服务单元测试（任务 5 更新：email 异常码迁移）。
 
 验证：
-  - register 注册逻辑：用户名重复时抛出 ValidationError(code=2001)，成功时新用户 membership 为 FREE
-  - login 登录逻辑：密码错误时抛出 AuthenticationError(code=1001)
+  - register 注册逻辑：邮箱重复时抛出 EmailConflictError(code=3010)，成功时新用户 membership 为 FREE
+  - login 登录逻辑：
+      - 邮箱不存在时抛出 LoginNotFoundError(code=1004)
+      - 密码错误时抛出 LoginNotFoundError(code=1004)
+      - 账号禁用时抛出 AccountDisabledError(code=1005)
   - refresh_access_token：传入 access_token（type 不匹配）时抛出 AuthenticationError
+
+需求覆盖：1.3, 1.4, 2.1, 2.2, 2.3, 2.4, 2.5, 2.6（任务 7.3）。
 """
 
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -59,7 +64,7 @@ class TestRegister:
         # 准备 mock db session
         db = AsyncMock()
         db.execute = AsyncMock()
-        # 模拟查询用户名不存在（返回 None）
+        # 模拟查询邮箱不存在（返回 None）
         mock_result = MagicMock()
         mock_result.scalar_one_or_none.return_value = None
         db.execute.return_value = mock_result
@@ -80,32 +85,32 @@ class TestRegister:
 
         db.add.side_effect = capture_add
 
-        user = await auth_service.register(db, "newuser", "password123")
+        user = await auth_service.register(db, "newuser@example.com", "password123")
 
-        assert user.username == "newuser"
+        assert user.email == "newuser@example.com"
         assert user.membership == MembershipTier.FREE
         db.add.assert_called_once()
         db.commit.assert_awaited_once()
 
-    async def test_register_duplicate_username_raises_validation_error(
+    async def test_register_duplicate_email_raises_email_conflict_error(
         self, auth_service
     ) -> None:
-        """用户名已存在时抛出 ValidationError(code=2001)。"""
-        from src.core.exceptions import ValidationError
+        """邮箱已存在时抛出 EmailConflictError(code=3010)。"""
+        from src.core.exceptions import EmailConflictError
         from src.models.user import User
 
         db = AsyncMock()
-        # 模拟查询用户名已存在
+        # 模拟查询邮箱已存在
         mock_result = MagicMock()
         existing_user = MagicMock(spec=User)
-        existing_user.username = "existinguser"
+        existing_user.email = "existing@example.com"
         mock_result.scalar_one_or_none.return_value = existing_user
         db.execute.return_value = mock_result
 
-        with pytest.raises(ValidationError) as exc_info:
-            await auth_service.register(db, "existinguser", "password123")
+        with pytest.raises(EmailConflictError) as exc_info:
+            await auth_service.register(db, "existing@example.com", "password123")
 
-        assert exc_info.value.code == 2001
+        assert exc_info.value.code == 3010
 
     async def test_register_hashes_password(self, auth_service, security) -> None:
         """注册时密码以 bcrypt 哈希存储，不明文保存。"""
@@ -127,7 +132,7 @@ class TestRegister:
 
         db.add.side_effect = capture_add
 
-        await auth_service.register(db, "testuser", "plaintext_password")
+        await auth_service.register(db, "test@example.com", "plaintext_password")
 
         assert len(added_user) == 1
         captured = added_user[0]
@@ -153,7 +158,7 @@ class TestLogin:
         mock_result = MagicMock()
         mock_user = MagicMock(spec=User)
         mock_user.id = 42
-        mock_user.username = "testuser"
+        mock_user.email = "test@example.com"
         mock_user.hashed_password = hashed_pw
         mock_user.membership = MembershipTier.FREE
         mock_user.is_active = True
@@ -161,7 +166,7 @@ class TestLogin:
         db.execute.return_value = mock_result
 
         access_token, refresh_token = await auth_service.login(
-            db, "testuser", "correctpassword"
+            db, "test@example.com", "correctpassword"
         )
 
         assert access_token
@@ -171,12 +176,12 @@ class TestLogin:
         assert payload["sub"] == "42"
         assert payload["type"] == "access"
 
-    async def test_login_wrong_password_raises_authentication_error(
+    async def test_login_wrong_password_raises_login_not_found_error(
         self, auth_service, security
     ) -> None:
-        """密码错误时抛出 AuthenticationError(code=1001)。"""
+        """密码错误时抛出 LoginNotFoundError(code=1004)，防止用户枚举。"""
         from src.core.enums import MembershipTier
-        from src.core.exceptions import AuthenticationError
+        from src.core.exceptions import LoginNotFoundError
         from src.models.user import User
 
         hashed_pw = security.hash_password("correctpassword")
@@ -191,33 +196,33 @@ class TestLogin:
         mock_result.scalar_one_or_none.return_value = mock_user
         db.execute.return_value = mock_result
 
-        with pytest.raises(AuthenticationError) as exc_info:
-            await auth_service.login(db, "testuser", "wrongpassword")
+        with pytest.raises(LoginNotFoundError) as exc_info:
+            await auth_service.login(db, "test@example.com", "wrongpassword")
 
-        assert exc_info.value.code == 1001
+        assert exc_info.value.code == 1004
 
-    async def test_login_user_not_found_raises_authentication_error(
+    async def test_login_user_not_found_raises_login_not_found_error(
         self, auth_service
     ) -> None:
-        """用户不存在时抛出 AuthenticationError(code=1001)。"""
-        from src.core.exceptions import AuthenticationError
+        """邮箱不存在时抛出 LoginNotFoundError(code=1004)，与密码错误同一错误码。"""
+        from src.core.exceptions import LoginNotFoundError
 
         db = AsyncMock()
         mock_result = MagicMock()
         mock_result.scalar_one_or_none.return_value = None
         db.execute.return_value = mock_result
 
-        with pytest.raises(AuthenticationError) as exc_info:
-            await auth_service.login(db, "nonexistent", "password")
+        with pytest.raises(LoginNotFoundError) as exc_info:
+            await auth_service.login(db, "nonexistent@example.com", "password")
 
-        assert exc_info.value.code == 1001
+        assert exc_info.value.code == 1004
 
-    async def test_login_inactive_user_raises_authentication_error(
+    async def test_login_inactive_user_raises_account_disabled_error(
         self, auth_service, security
     ) -> None:
-        """禁用用户登录时抛出 AuthenticationError(code=1001)。"""
+        """禁用账号登录时抛出 AccountDisabledError(code=1005)。"""
         from src.core.enums import MembershipTier
-        from src.core.exceptions import AuthenticationError
+        from src.core.exceptions import AccountDisabledError
         from src.models.user import User
 
         hashed_pw = security.hash_password("password")
@@ -232,10 +237,10 @@ class TestLogin:
         mock_result.scalar_one_or_none.return_value = mock_user
         db.execute.return_value = mock_result
 
-        with pytest.raises(AuthenticationError) as exc_info:
-            await auth_service.login(db, "disableduser", "password")
+        with pytest.raises(AccountDisabledError) as exc_info:
+            await auth_service.login(db, "disabled@example.com", "password")
 
-        assert exc_info.value.code == 1001
+        assert exc_info.value.code == 1005
 
 
 class TestRefreshAccessToken:

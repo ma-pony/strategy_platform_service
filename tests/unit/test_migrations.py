@@ -21,6 +21,9 @@ EXPECTED_MIGRATIONS = {
     "005": "create_research_reports",
 }
 
+# email-auth 迁移文件的 slug 前缀（按命名规范）
+EMAIL_AUTH_MIGRATION_SLUG = "replace_username_with_email_in_users"
+
 
 def _load_migration(rev_id: str):
     """加载指定 revision 的迁移模块。"""
@@ -103,3 +106,82 @@ class TestMigrationChain:
         """005 迁移应依赖 004。"""
         module = _load_migration("005")
         assert module.down_revision == "004"
+
+
+def _load_email_auth_migration():
+    """加载 replace_username_with_email_in_users 迁移模块。"""
+    files = list(MIGRATIONS_DIR.glob(f"*{EMAIL_AUTH_MIGRATION_SLUG}.py"))
+    assert len(files) == 1, (
+        f"找不到包含 '{EMAIL_AUTH_MIGRATION_SLUG}' 的迁移文件"
+    )
+    module_name = f"migrations.versions.{files[0].stem}"
+    return importlib.import_module(module_name)
+
+
+class TestEmailAuthMigration:
+    """验证 replace_username_with_email_in_users 迁移文件（任务 2.2）。"""
+
+    def test_email_auth_migration_file_exists(self) -> None:
+        """replace_username_with_email_in_users 迁移文件应存在。"""
+        files = list(MIGRATIONS_DIR.glob(f"*{EMAIL_AUTH_MIGRATION_SLUG}.py"))
+        assert len(files) == 1, (
+            f"缺少包含 '{EMAIL_AUTH_MIGRATION_SLUG}' 的迁移文件"
+        )
+
+    def test_email_auth_migration_has_upgrade(self) -> None:
+        """迁移文件应有 upgrade() 函数。"""
+        module = _load_email_auth_migration()
+        assert hasattr(module, "upgrade")
+        assert callable(module.upgrade)
+
+    def test_email_auth_migration_has_downgrade(self) -> None:
+        """迁移文件应有 downgrade() 函数。"""
+        module = _load_email_auth_migration()
+        assert hasattr(module, "downgrade")
+        assert callable(module.downgrade)
+
+    def test_email_auth_migration_has_revision_id(self) -> None:
+        """迁移文件应声明 revision 字符串。"""
+        module = _load_email_auth_migration()
+        assert hasattr(module, "revision")
+        assert isinstance(module.revision, str)
+        assert len(module.revision) > 0
+
+    def test_email_auth_migration_depends_on_058bf947c029(self) -> None:
+        """email-auth 迁移应依赖 058bf947c029（最新已有迁移）。"""
+        module = _load_email_auth_migration()
+        assert module.down_revision == "058bf947c029"
+
+    def test_email_auth_migration_upgrade_adds_email_removes_username(self) -> None:
+        """upgrade() 逻辑中应包含 email 列操作（通过源码检查）。"""
+        files = list(MIGRATIONS_DIR.glob(f"*{EMAIL_AUTH_MIGRATION_SLUG}.py"))
+        assert len(files) == 1
+        source = files[0].read_text()
+        # upgrade 应新增 email 列
+        assert "email" in source
+        # upgrade 应删除 username 列（通过 drop_column）
+        assert "drop_column" in source
+        assert "username" in source
+
+    def test_email_auth_migration_downgrade_restores_username(self) -> None:
+        """downgrade() 逻辑中应包含还原 username 列操作。"""
+        files = list(MIGRATIONS_DIR.glob(f"*{EMAIL_AUTH_MIGRATION_SLUG}.py"))
+        assert len(files) == 1
+        source = files[0].read_text()
+        # downgrade 应能还原 username 列
+        assert "downgrade" in source
+        assert "username" in source
+
+    def test_email_auth_migration_creates_idx_users_email(self) -> None:
+        """upgrade() 应创建 idx_users_email 索引（需求 3.3）。"""
+        files = list(MIGRATIONS_DIR.glob(f"*{EMAIL_AUTH_MIGRATION_SLUG}.py"))
+        assert len(files) == 1
+        source = files[0].read_text()
+        assert "idx_users_email" in source
+
+    def test_email_auth_migration_drops_idx_users_username(self) -> None:
+        """upgrade() 应删除旧的 idx_users_username 索引。"""
+        files = list(MIGRATIONS_DIR.glob(f"*{EMAIL_AUTH_MIGRATION_SLUG}.py"))
+        assert len(files) == 1
+        source = files[0].read_text()
+        assert "idx_users_username" in source

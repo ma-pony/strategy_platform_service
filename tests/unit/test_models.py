@@ -75,7 +75,7 @@ class TestTimestampMixin:
 
 
 class TestUserModel:
-    """测试 User 数据模型。"""
+    """测试 User 数据模型（任务 2.1：username → email）。"""
 
     def test_user_tablename(self) -> None:
         """User 模型表名应为 users。"""
@@ -84,7 +84,7 @@ class TestUserModel:
         assert User.__tablename__ == "users"
 
     def test_user_has_required_columns(self) -> None:
-        """User 模型应包含所有必需字段。"""
+        """User 模型应包含所有必需字段（email 替换 username）。"""
         from sqlalchemy.orm import class_mapper
 
         from src.models.user import User
@@ -92,7 +92,8 @@ class TestUserModel:
         mapper = class_mapper(User)
         column_names = {c.key for c in mapper.columns}
         assert "id" in column_names
-        assert "username" in column_names
+        assert "email" in column_names
+        assert "username" not in column_names
         assert "hashed_password" in column_names
         assert "membership" in column_names
         assert "is_active" in column_names
@@ -100,15 +101,55 @@ class TestUserModel:
         assert "created_at" in column_names
         assert "updated_at" in column_names
 
-    def test_user_username_unique(self) -> None:
-        """username 字段应有唯一约束。"""
+    def test_user_email_unique(self) -> None:
+        """email 字段应有唯一约束（需求 3.3）。"""
         from sqlalchemy.orm import class_mapper
 
         from src.models.user import User
 
         mapper = class_mapper(User)
-        col = mapper.columns["username"]
+        col = mapper.columns["email"]
         assert col.unique is True
+
+    def test_user_email_max_length_254(self) -> None:
+        """email 字段最大长度应为 254（遵循 RFC 5321）。"""
+        from sqlalchemy import String
+        from sqlalchemy.orm import class_mapper
+
+        from src.models.user import User
+
+        mapper = class_mapper(User)
+        col = mapper.columns["email"]
+        assert isinstance(col.type, String)
+        assert col.type.length == 254
+
+    def test_user_email_not_nullable(self) -> None:
+        """email 字段不可为空（需求 3.1）。"""
+        from sqlalchemy.orm import class_mapper
+
+        from src.models.user import User
+
+        mapper = class_mapper(User)
+        col = mapper.columns["email"]
+        assert col.nullable is False
+
+    def test_user_has_idx_users_email_index(self) -> None:
+        """User 模型应有 idx_users_email 索引，不应有 idx_users_username（需求 3.3）。"""
+        from src.models.user import User
+
+        index_names = {idx.name for idx in User.__table__.indexes}
+        assert "idx_users_email" in index_names
+        assert "idx_users_username" not in index_names
+
+    def test_user_no_username_field(self) -> None:
+        """User 模型不应有 username 字段（需求 3.1）。"""
+        from sqlalchemy.orm import class_mapper
+
+        from src.models.user import User
+
+        mapper = class_mapper(User)
+        column_names = {c.key for c in mapper.columns}
+        assert "username" not in column_names
 
     def test_user_inherits_timestamp_mixin(self) -> None:
         """User 应继承 TimestampMixin。"""
@@ -124,7 +165,7 @@ class TestUserModel:
         engine = create_engine("sqlite:///:memory:")
         Base.metadata.create_all(engine)
         with Session(engine) as session:
-            user = User(username="testuser", hashed_password="hashed")
+            user = User(email="test@example.com", hashed_password="hashed")
             session.add(user)
             session.commit()
             session.refresh(user)
@@ -139,7 +180,7 @@ class TestUserModel:
         engine = create_engine("sqlite:///:memory:")
         Base.metadata.create_all(engine)
         with Session(engine) as session:
-            user = User(username="testuser", hashed_password="hashed")
+            user = User(email="test@example.com", hashed_password="hashed")
             session.add(user)
             session.commit()
             session.refresh(user)

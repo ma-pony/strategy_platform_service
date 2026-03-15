@@ -1,26 +1,31 @@
-"""sqladmin ModelView 视图定义（任务 11.2）。
+"""sqladmin ModelView 视图定义（任务 11.2, Task 6）。
 
-提供三个管理视图：
+提供以下管理视图：
   - UserAdmin：用户管理（列表展示、搜索、排序，禁止删除）
   - StrategyAdmin：策略管理（列表、创建、编辑）
   - ReportAdmin：研报管理（列表、创建、编辑、搜索、排序）
+  - StrategyPairMetricsAdmin：策略对绩效指标管理（只读监控，禁止删除，允许手动修正）
 
 关键约束：
   - UserAdmin.can_delete = False：禁止后台删除用户
+  - StrategyPairMetricsAdmin.can_delete = False：禁止删除历史绩效数据
   - 所有 ModelView 使用 SQLAlchemy 模型与 sqladmin 集成
 """
 
 from sqladmin import ModelView
 
+from src.models.backtest import BacktestResult, BacktestTask
 from src.models.report import ResearchReport
+from src.models.signal import TradingSignal
 from src.models.strategy import Strategy
+from src.models.strategy_pair_metrics import StrategyPairMetrics
 from src.models.user import User
 
 
 class UserAdmin(ModelView, model=User):
     """用户管理视图。
 
-    支持列表展示、按 username 搜索、按 created_at 排序。
+    支持列表展示、按 email 搜索、按 created_at 排序。
     允许编辑 membership 和 is_active 字段。
     禁止后台删除用户（can_delete=False）。
     """
@@ -31,7 +36,7 @@ class UserAdmin(ModelView, model=User):
     # 展示列
     column_list = [
         User.id,
-        User.username,
+        User.email,
         User.membership,
         User.is_active,
         User.is_admin,
@@ -39,7 +44,7 @@ class UserAdmin(ModelView, model=User):
     ]
 
     # 可搜索字段
-    column_searchable_list = [User.username]
+    column_searchable_list = [User.email]
 
     # 可排序字段
     column_sortable_list = [User.created_at]
@@ -116,3 +121,153 @@ class ReportAdmin(ModelView, model=ResearchReport):
     can_edit = True
     can_delete = True
     can_view_details = True
+
+
+class TradingSignalAdmin(ModelView, model=TradingSignal):
+    """交易信号管理视图。"""
+
+    name = "交易信号"
+    name_plural = "交易信号列表"
+
+    column_list = [
+        TradingSignal.id,
+        TradingSignal.strategy_id,
+        TradingSignal.pair,
+        TradingSignal.direction,
+        TradingSignal.confidence_score,
+        TradingSignal.signal_at,
+        TradingSignal.entry_price,
+        TradingSignal.stop_loss,
+        TradingSignal.take_profit,
+        TradingSignal.timeframe,
+        TradingSignal.signal_strength,
+    ]
+
+    column_searchable_list = [TradingSignal.pair, TradingSignal.direction]
+    column_sortable_list = [TradingSignal.signal_at, TradingSignal.confidence_score]
+
+    can_create = True
+    can_edit = True
+    can_delete = True
+    can_view_details = True
+
+
+class BacktestTaskAdmin(ModelView, model=BacktestTask):
+    """回测任务管理视图。"""
+
+    name = "回测任务"
+    name_plural = "回测任务列表"
+
+    column_list = [
+        BacktestTask.id,
+        BacktestTask.strategy_id,
+        BacktestTask.status,
+        BacktestTask.timerange,
+        BacktestTask.error_message,
+        BacktestTask.created_at,
+    ]
+
+    column_searchable_list = [BacktestTask.status]
+    column_sortable_list = [BacktestTask.created_at]
+
+    can_create = True
+    can_edit = True
+    can_delete = True
+    can_view_details = True
+
+
+class BacktestResultAdmin(ModelView, model=BacktestResult):
+    """回测结果管理视图。"""
+
+    name = "回测结果"
+    name_plural = "回测结果列表"
+
+    column_list = [
+        BacktestResult.id,
+        BacktestResult.strategy_id,
+        BacktestResult.task_id,
+        BacktestResult.total_return,
+        BacktestResult.annual_return,
+        BacktestResult.sharpe_ratio,
+        BacktestResult.max_drawdown,
+        BacktestResult.trade_count,
+        BacktestResult.win_rate,
+    ]
+
+    column_sortable_list = [BacktestResult.sharpe_ratio, BacktestResult.total_return]
+
+    can_create = True
+    can_edit = True
+    can_delete = True
+    can_view_details = True
+
+
+class StrategyPairMetricsAdmin(ModelView, model=StrategyPairMetrics):
+    """策略对绩效指标管理视图（Task 6）。
+
+    提供策略对绩效指标的只读监控视图，支持手动修正异常数据。
+    禁止通过后台删除历史绩效数据（can_delete=False，需求 5.4）。
+    由 Worker 任务创建记录，后台不允许新建（can_create=False）。
+    允许管理员手动编辑单条记录（can_edit=True，需求 5.5）。
+
+    展示字段：strategy_id, pair, timeframe, total_return, profit_factor,
+              max_drawdown, sharpe_ratio, trade_count, data_source, last_updated_at
+    搜索：pair, timeframe, data_source（需求 5.2）
+    筛选：strategy_id, pair, timeframe, data_source（需求 5.2）
+    排序：last_updated_at, total_return（需求 5.3）
+    """
+
+    name = "策略对绩效"
+    name_plural = "策略对绩效列表"
+
+    # 展示列（需求 5.1）
+    column_list = [
+        StrategyPairMetrics.strategy_id,
+        StrategyPairMetrics.pair,
+        StrategyPairMetrics.timeframe,
+        StrategyPairMetrics.total_return,
+        StrategyPairMetrics.profit_factor,
+        StrategyPairMetrics.max_drawdown,
+        StrategyPairMetrics.sharpe_ratio,
+        StrategyPairMetrics.trade_count,
+        StrategyPairMetrics.data_source,
+        StrategyPairMetrics.last_updated_at,
+    ]
+
+    # 可搜索字段（需求 5.2）
+    column_searchable_list = [
+        StrategyPairMetrics.pair,
+        StrategyPairMetrics.timeframe,
+        StrategyPairMetrics.data_source,
+    ]
+
+    # 可筛选字段（需求 5.2）
+    column_filters = [
+        StrategyPairMetrics.strategy_id,
+        StrategyPairMetrics.pair,
+        StrategyPairMetrics.timeframe,
+        StrategyPairMetrics.data_source,
+    ]
+
+    # 可排序字段（需求 5.3）
+    column_sortable_list = [
+        StrategyPairMetrics.last_updated_at,
+        StrategyPairMetrics.total_return,
+    ]
+
+    # 权限配置（需求 5.4, 5.5）
+    can_delete = False   # 禁止删除，保护历史数据完整性（需求 5.4）
+    can_create = False   # 由 Worker 任务创建，不在后台创建
+    can_edit = True      # 允许管理员手动修正异常数据（需求 5.5）
+    can_view_details = True
+
+    # 可编辑字段（含全部指标字段及元数据，需求 5.5）
+    form_columns = [
+        StrategyPairMetrics.total_return,
+        StrategyPairMetrics.profit_factor,
+        StrategyPairMetrics.max_drawdown,
+        StrategyPairMetrics.sharpe_ratio,
+        StrategyPairMetrics.trade_count,
+        StrategyPairMetrics.data_source,
+        StrategyPairMetrics.last_updated_at,
+    ]

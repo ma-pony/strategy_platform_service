@@ -16,7 +16,15 @@ from sqladmin import Admin
 from sqlalchemy.engine import Engine
 
 from src.admin.auth import AdminAuth
-from src.admin.views import ReportAdmin, StrategyAdmin, UserAdmin
+from src.admin.views import (
+    BacktestResultAdmin,
+    BacktestTaskAdmin,
+    ReportAdmin,
+    StrategyAdmin,
+    StrategyPairMetricsAdmin,
+    TradingSignalAdmin,
+    UserAdmin,
+)
 
 
 def setup_admin(app: FastAPI, sync_engine: Engine) -> None:
@@ -47,7 +55,11 @@ def setup_admin(app: FastAPI, sync_engine: Engine) -> None:
         base_url="/admin",
     )
 
-    # 注册三个 ModelView
+    # 注册 ModelView
     admin.add_view(UserAdmin)
     admin.add_view(StrategyAdmin)
     admin.add_view(ReportAdmin)
+    admin.add_view(TradingSignalAdmin)
+    admin.add_view(BacktestTaskAdmin)
+    admin.add_view(BacktestResultAdmin)
+    admin.add_view(StrategyPairMetricsAdmin)  # Task 6：策略对绩效指标管理视图

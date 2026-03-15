@@ -96,12 +96,14 @@ def _register_routers(app: FastAPI) -> None:
     from src.api.admin_backtests import router as admin_backtests_router
     from src.api.auth import router as auth_router
     from src.api.backtests import router as backtests_router
+    from src.api.health import router as health_router
     from src.api.reports import router as reports_router
     from src.api.signals import router as signals_router
     from src.api.strategies import router as strategies_router
 
     api_v1_prefix = "/api/v1"
 
+    app.include_router(health_router, prefix=api_v1_prefix)
     app.include_router(auth_router, prefix=api_v1_prefix)
     app.include_router(strategies_router, prefix=api_v1_prefix)
     app.include_router(backtests_router, prefix=api_v1_prefix)

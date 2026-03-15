@@ -45,7 +45,7 @@ class TestBacktestPersistence:
 
         # 1. 插入 User（FK 依赖）
         user = User(
-            username="db_persist_test_user",
+            email="db_persist_test_user@example.com",
             hashed_password="hashed_pw_placeholder",
             membership=MembershipTier.VIP1,
             is_active=True,
@@ -189,7 +189,7 @@ class TestUserMembershipPersistence:
         from src.models.user import User
 
         user = User(
-            username="free_member_persist_test",
+            email="free_member_persist_test@example.com",
             hashed_password="hashed_free_pw",
             membership=MembershipTier.FREE,
             is_active=True,
@@ -199,12 +199,12 @@ class TestUserMembershipPersistence:
         await real_db_session.commit()
 
         # 重新查询
-        stmt = select(User).where(User.username == "free_member_persist_test")
+        stmt = select(User).where(User.email == "free_member_persist_test@example.com")
         query_result = await real_db_session.execute(stmt)
         persisted_user = query_result.scalar_one_or_none()
 
         assert persisted_user is not None
-        assert persisted_user.username == "free_member_persist_test"
+        assert persisted_user.email == "free_member_persist_test@example.com"
         assert persisted_user.membership == MembershipTier.FREE
         assert persisted_user.is_active is True
         assert persisted_user.is_admin is False
@@ -217,7 +217,7 @@ class TestUserMembershipPersistence:
         from src.models.user import User
 
         user = User(
-            username="vip1_member_persist_test",
+            email="vip1_member_persist_test@example.com",
             hashed_password="hashed_vip1_pw",
             membership=MembershipTier.VIP1,
             is_active=True,
@@ -226,7 +226,7 @@ class TestUserMembershipPersistence:
         real_db_session.add(user)
         await real_db_session.commit()
 
-        stmt = select(User).where(User.username == "vip1_member_persist_test")
+        stmt = select(User).where(User.email == "vip1_member_persist_test@example.com")
         query_result = await real_db_session.execute(stmt)
         persisted_user = query_result.scalar_one_or_none()
 
@@ -241,7 +241,7 @@ class TestUserMembershipPersistence:
         from src.models.user import User
 
         user = User(
-            username="vip2_member_persist_test",
+            email="vip2_member_persist_test@example.com",
             hashed_password="hashed_vip2_pw",
             membership=MembershipTier.VIP2,
             is_active=True,
@@ -250,7 +250,7 @@ class TestUserMembershipPersistence:
         real_db_session.add(user)
         await real_db_session.commit()
 
-        stmt = select(User).where(User.username == "vip2_member_persist_test")
+        stmt = select(User).where(User.email == "vip2_member_persist_test@example.com")
         query_result = await real_db_session.execute(stmt)
         persisted_user = query_result.scalar_one_or_none()
 
@@ -265,7 +265,7 @@ class TestUserMembershipPersistence:
         from src.models.user import User
 
         user = User(
-            username="upgrade_test_user",
+            email="upgrade_test_user@example.com",
             hashed_password="hashed_pw_upgrade",
             membership=MembershipTier.FREE,
             is_active=True,
@@ -279,7 +279,7 @@ class TestUserMembershipPersistence:
         await real_db_session.commit()
 
         # 重查验证升级后的等级
-        stmt = select(User).where(User.username == "upgrade_test_user")
+        stmt = select(User).where(User.email == "upgrade_test_user@example.com")
         query_result = await real_db_session.execute(stmt)
         persisted_user = query_result.scalar_one_or_none()
 

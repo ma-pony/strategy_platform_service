@@ -35,13 +35,13 @@ def env_setup(monkeypatch: pytest.MonkeyPatch):
 
 def _make_admin_user():
     return SimpleNamespace(
-        id=1, username="admin", membership="free", is_active=True, is_admin=True,
+        id=1, email="admin@example.com", membership="free", is_active=True, is_admin=True,
     )
 
 
 def _make_normal_user():
     return SimpleNamespace(
-        id=2, username="user", membership="free", is_active=True, is_admin=False,
+        id=2, email="user@example.com", membership="free", is_active=True, is_admin=False,
     )
 
 
@@ -369,3 +369,272 @@ class TestAdminBacktestTask5:
         assert body["code"] == 0
         assert body["data"]["status"] == "running"
         assert body["data"]["result_summary"] is None
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Batch 2：补齐管理员回测接口级别测试用例
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+class TestAdminBacktestSubmitValidation:
+    """POST /api/v1/admin/backtests 输入验证测试。"""
+
+    @pytest.mark.asyncio
+    async def test_invalid_timerange_format_returns_422(
+        self, admin_client: AsyncClient
+    ) -> None:
+        """timerange 格式不合法（不匹配 YYYYMMDD-YYYYMMDD）→ HTTP 422。"""
+        resp = await admin_client.post(
+            "/api/v1/admin/backtests",
+            json={"strategy_id": 1, "timerange": "2024-01-01 to 2024-03-01"},
+        )
+        assert resp.status_code == 422
+
+    @pytest.mark.asyncio
+    async def test_missing_strategy_id_returns_422(
+        self, admin_client: AsyncClient
+    ) -> None:
+        """缺少 strategy_id 字段 → HTTP 422。"""
+        resp = await admin_client.post(
+            "/api/v1/admin/backtests",
+            json={"timerange": "20240101-20240301"},
+        )
+        assert resp.status_code == 422
+
+    @pytest.mark.asyncio
+    async def test_missing_timerange_returns_422(
+        self, admin_client: AsyncClient
+    ) -> None:
+        """缺少 timerange 字段 → HTTP 422。"""
+        resp = await admin_client.post(
+            "/api/v1/admin/backtests",
+            json={"strategy_id": 1},
+        )
+        assert resp.status_code == 422
+
+    @pytest.mark.asyncio
+    async def test_empty_body_returns_422(
+        self, admin_client: AsyncClient
+    ) -> None:
+        """空请求体 → HTTP 422。"""
+        resp = await admin_client.post(
+            "/api/v1/admin/backtests",
+            json={},
+        )
+        assert resp.status_code == 422
+
+    @pytest.mark.asyncio
+    async def test_anonymous_submit_returns_401(
+        self, bare_client: AsyncClient
+    ) -> None:
+        """匿名用户提交回测 → HTTP 401 + code:1001。"""
+        resp = await bare_client.post(
+            "/api/v1/admin/backtests",
+            json={"strategy_id": 1, "timerange": "20240101-20240301"},
+        )
+        assert resp.status_code == 401
+        assert resp.json()["code"] == 1001
+
+
+class TestAdminBacktestGetAuth:
+    """GET /api/v1/admin/backtests/{task_id} 权限测试。"""
+
+    @pytest.mark.asyncio
+    async def test_non_admin_get_task_returns_403(
+        self, non_admin_client: AsyncClient
+    ) -> None:
+        """非管理员用户查询任务详情 → HTTP 403 + code:1002。"""
+        resp = await non_admin_client.get("/api/v1/admin/backtests/1")
+        assert resp.status_code == 403
+        assert resp.json()["code"] == 1002
+
+    @pytest.mark.asyncio
+    async def test_anonymous_get_task_returns_401(
+        self, bare_client: AsyncClient
+    ) -> None:
+        """匿名用户查询任务详情 → HTTP 401 + code:1001。"""
+        resp = await bare_client.get("/api/v1/admin/backtests/1")
+        assert resp.status_code == 401
+        assert resp.json()["code"] == 1001
+
+    @pytest.mark.asyncio
+    async def test_completed_task_returns_result_summary(
+        self, admin_client: AsyncClient
+    ) -> None:
+        """COMPLETED 任务详情 → 包含 result_summary 数据。"""
+        mock_task = _make_mock_task(id=5, status=TaskStatus.DONE)
+        mock_task.result_json = {
+            "total_return": 0.15,
+            "annual_return": 0.30,
+            "sharpe_ratio": 1.5,
+            "max_drawdown": -0.08,
+            "trade_count": 42,
+            "win_rate": 0.62,
+        }
+
+        with patch(
+            "src.services.admin_backtest_service.AdminBacktestService.get_task",
+            new_callable=AsyncMock,
+            return_value=mock_task,
+        ):
+            resp = await admin_client.get("/api/v1/admin/backtests/5")
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["code"] == 0
+        assert body["data"]["status"] == "done"
+        summary = body["data"]["result_summary"]
+        assert summary is not None
+        assert summary["total_return"] == 0.15
+        assert summary["trade_count"] == 42
+        assert summary["win_rate"] == 0.62
+
+    @pytest.mark.asyncio
+    async def test_failed_task_returns_error_message(
+        self, admin_client: AsyncClient
+    ) -> None:
+        """FAILED 任务详情 → 包含 error_message，result_summary 为 None。"""
+        mock_task = _make_mock_task(id=7, status=TaskStatus.FAILED)
+        mock_task.error_message = "freqtrade subprocess exited with code 1"
+        mock_task.result_json = None
+
+        with patch(
+            "src.services.admin_backtest_service.AdminBacktestService.get_task",
+            new_callable=AsyncMock,
+            return_value=mock_task,
+        ):
+            resp = await admin_client.get("/api/v1/admin/backtests/7")
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["code"] == 0
+        assert body["data"]["status"] == "failed"
+        assert body["data"]["error_message"] == "freqtrade subprocess exited with code 1"
+        assert body["data"]["result_summary"] is None
+
+    @pytest.mark.asyncio
+    async def test_pending_task_returns_no_result(
+        self, admin_client: AsyncClient
+    ) -> None:
+        """PENDING 任务详情 → result_summary 和 error_message 均为 None。"""
+        mock_task = _make_mock_task(id=3, status=TaskStatus.PENDING)
+        mock_task.result_json = None
+        mock_task.error_message = None
+
+        with patch(
+            "src.services.admin_backtest_service.AdminBacktestService.get_task",
+            new_callable=AsyncMock,
+            return_value=mock_task,
+        ):
+            resp = await admin_client.get("/api/v1/admin/backtests/3")
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["data"]["status"] == "pending"
+        assert body["data"]["result_summary"] is None
+        assert body["data"]["error_message"] is None
+
+
+class TestAdminBacktestListAuth:
+    """GET /api/v1/admin/backtests 权限与筛选测试。"""
+
+    @pytest.mark.asyncio
+    async def test_non_admin_list_returns_403(
+        self, non_admin_client: AsyncClient
+    ) -> None:
+        """非管理员用户访问任务列表 → HTTP 403 + code:1002。"""
+        resp = await non_admin_client.get("/api/v1/admin/backtests")
+        assert resp.status_code == 403
+        assert resp.json()["code"] == 1002
+
+    @pytest.mark.asyncio
+    async def test_anonymous_list_returns_401(
+        self, bare_client: AsyncClient
+    ) -> None:
+        """匿名用户访问任务列表 → HTTP 401 + code:1001。"""
+        resp = await bare_client.get("/api/v1/admin/backtests")
+        assert resp.status_code == 401
+        assert resp.json()["code"] == 1001
+
+    @pytest.mark.asyncio
+    async def test_strategy_name_filter_passed_to_service(
+        self, admin_client: AsyncClient
+    ) -> None:
+        """strategy_name 筛选参数被正确传递至 service 层。"""
+        with patch(
+            "src.services.admin_backtest_service.AdminBacktestService.list_tasks",
+            new_callable=AsyncMock,
+            return_value=([], 0),
+        ) as mock_list:
+            resp = await admin_client.get(
+                "/api/v1/admin/backtests",
+                params={"strategy_name": "BollingerBands"},
+            )
+
+        assert resp.status_code == 200
+        mock_list.assert_called_once()
+        call_kwargs = mock_list.call_args
+        # 确认 strategy_name 参数被传递
+        assert call_kwargs.kwargs.get("strategy_name") == "BollingerBands" or \
+            (len(call_kwargs.args) > 0 and "BollingerBands" in str(call_kwargs))
+
+    @pytest.mark.asyncio
+    async def test_status_filter_passed_to_service(
+        self, admin_client: AsyncClient
+    ) -> None:
+        """status 筛选参数被正确传递至 service 层。"""
+        with patch(
+            "src.services.admin_backtest_service.AdminBacktestService.list_tasks",
+            new_callable=AsyncMock,
+            return_value=([], 0),
+        ) as mock_list:
+            resp = await admin_client.get(
+                "/api/v1/admin/backtests",
+                params={"status": "completed"},
+            )
+
+        assert resp.status_code == 200
+        mock_list.assert_called_once()
+        call_kwargs = mock_list.call_args
+        assert call_kwargs.kwargs.get("status") == "completed" or \
+            (len(call_kwargs.args) > 0 and "completed" in str(call_kwargs))
+
+    @pytest.mark.asyncio
+    async def test_page_size_exceeds_limit_returns_422(
+        self, admin_client: AsyncClient
+    ) -> None:
+        """page_size=200（超过 100 上限）→ HTTP 422。"""
+        resp = await admin_client.get(
+            "/api/v1/admin/backtests",
+            params={"page_size": 200},
+        )
+        assert resp.status_code == 422
+
+    @pytest.mark.asyncio
+    async def test_page_zero_returns_422(
+        self, admin_client: AsyncClient
+    ) -> None:
+        """page=0（小于最小值 1）→ HTTP 422。"""
+        resp = await admin_client.get(
+            "/api/v1/admin/backtests",
+            params={"page": 0},
+        )
+        assert resp.status_code == 422
+
+    @pytest.mark.asyncio
+    async def test_empty_result_returns_valid_pagination(
+        self, admin_client: AsyncClient
+    ) -> None:
+        """空结果集返回合法的分页结构（items=[], total=0）。"""
+        with patch(
+            "src.services.admin_backtest_service.AdminBacktestService.list_tasks",
+            new_callable=AsyncMock,
+            return_value=([], 0),
+        ):
+            resp = await admin_client.get("/api/v1/admin/backtests")
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["code"] == 0
+        assert body["data"]["items"] == []
+        assert body["data"]["total"] == 0

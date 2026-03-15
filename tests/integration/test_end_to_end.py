@@ -386,7 +386,7 @@ class TestErrorScenarios:
         try:
             response = await client.post(
                 "/api/v1/auth/register",
-                json={"username": "only"},  # 缺少 password
+                json={"email": "only@example.com"},  # 缺少 password
             )
         finally:
             app.dependency_overrides.clear()
@@ -436,6 +436,7 @@ class TestErrorScenarios:
         # 构造一个 mock Request
         mock_request = MagicMock(spec=Request)
         mock_request.url = MagicMock()
+        mock_request.url.path = "/api/v1/strategies"
         mock_request.url.__str__ = lambda self: "http://test/api/v1/strategies"
 
         exc = RuntimeError("数据库连接断开")

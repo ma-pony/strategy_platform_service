@@ -270,6 +270,124 @@ class TestBacktestListEndpoint:
         assert item["total_return"] == pytest.approx(0.15)
 
 
+class TestBacktestListFieldVisibility:
+    """GET /api/v1/strategies/{id}/backtests 字段可见性及边界校验补充测试（审计批次 1）。"""
+
+    @pytest.mark.asyncio
+    async def test_vip2_user_sees_all_fields_in_backtest_list(
+        self, client: AsyncClient, app
+    ) -> None:
+        """VIP2 用户回测列表中所有字段均可见（包括 sharpe_ratio / win_rate）。"""
+        from src.core.deps import get_db, get_optional_user
+        from src.core.enums import MembershipTier
+
+        result = _make_mock_backtest_result()
+        mock_db = _make_mock_db()
+
+        mock_vip2_user = MagicMock()
+        mock_vip2_user.membership = MembershipTier.VIP2
+        mock_vip2_user.is_active = True
+
+        async def override_get_db():
+            yield mock_db
+
+        async def override_get_optional_user():
+            return mock_vip2_user
+
+        with patch(
+            "src.api.backtests._backtest_service.list_backtests",
+            new_callable=AsyncMock,
+            return_value=([result], 1),
+        ):
+            app.dependency_overrides[get_db] = override_get_db
+            app.dependency_overrides[get_optional_user] = override_get_optional_user
+            try:
+                response = await client.get("/api/v1/strategies/1/backtests")
+            finally:
+                app.dependency_overrides.clear()
+
+        assert response.status_code == 200
+        item = response.json()["data"]["items"][0]
+        assert item["sharpe_ratio"] == pytest.approx(1.5)
+        assert item["win_rate"] == pytest.approx(0.60)
+        assert item["total_return"] == pytest.approx(0.15)
+        assert item["trade_count"] == 50
+
+    @pytest.mark.asyncio
+    async def test_backtest_list_page_size_over_limit_returns_422_code_2001(
+        self, client: AsyncClient, app
+    ) -> None:
+        """page_size=200（超过上限）时返回 HTTP 422 + code:2001。"""
+        from src.core.deps import get_db
+
+        mock_db = _make_mock_db()
+
+        async def override_get_db():
+            yield mock_db
+
+        app.dependency_overrides[get_db] = override_get_db
+        try:
+            response = await client.get("/api/v1/strategies/1/backtests?page_size=200")
+        finally:
+            app.dependency_overrides.clear()
+
+        assert response.status_code == 422
+        body = response.json()
+        assert body["code"] == 2001
+
+    @pytest.mark.asyncio
+    async def test_backtest_list_page_zero_returns_422_code_2001(
+        self, client: AsyncClient, app
+    ) -> None:
+        """page=0 时返回 HTTP 422 + code:2001（页码最小值为 1）。"""
+        from src.core.deps import get_db
+
+        mock_db = _make_mock_db()
+
+        async def override_get_db():
+            yield mock_db
+
+        app.dependency_overrides[get_db] = override_get_db
+        try:
+            response = await client.get("/api/v1/strategies/1/backtests?page=0")
+        finally:
+            app.dependency_overrides.clear()
+
+        assert response.status_code == 422
+        body = response.json()
+        assert body["code"] == 2001
+
+    @pytest.mark.asyncio
+    async def test_backtest_list_bad_token_treated_as_anonymous(
+        self, client: AsyncClient, app
+    ) -> None:
+        """携带无效 token 时，软鉴权静默降级为匿名，回测列表返回 HTTP 200。"""
+        from src.core.deps import get_db
+
+        mock_db = _make_mock_db()
+
+        async def override_get_db():
+            yield mock_db
+
+        with patch(
+            "src.api.backtests._backtest_service.list_backtests",
+            new_callable=AsyncMock,
+            return_value=([], 0),
+        ):
+            app.dependency_overrides[get_db] = override_get_db
+            try:
+                response = await client.get(
+                    "/api/v1/strategies/1/backtests",
+                    headers={"Authorization": "Bearer this.is.an.invalid.token"},
+                )
+            finally:
+                app.dependency_overrides.clear()
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["code"] == 0
+
+
 class TestBacktestDetailEndpoint:
     """GET /api/v1/backtests/{id} 详情接口测试。"""
 
@@ -369,3 +487,144 @@ class TestBacktestDetailEndpoint:
         assert data["sharpe_ratio"] == pytest.approx(1.5)
         assert data["win_rate"] == pytest.approx(0.60)
         assert data["annual_return"] == pytest.approx(0.20)
+
+
+class TestBacktestDetailFieldVisibility:
+    """GET /api/v1/backtests/{id} 字段可见性及边界场景补充测试（审计批次 1）。"""
+
+    @pytest.mark.asyncio
+    async def test_free_user_sees_base_but_not_vip_fields_in_detail(
+        self, client: AsyncClient, app
+    ) -> None:
+        """Free 用户访问回测详情：total_return / trade_count / max_drawdown 可见，
+        sharpe_ratio / win_rate 为 null。"""
+        from src.core.deps import get_db, get_optional_user
+        from src.core.enums import MembershipTier
+
+        result = _make_mock_backtest_result()
+        mock_db = _make_mock_db()
+
+        mock_free_user = MagicMock()
+        mock_free_user.membership = MembershipTier.FREE
+        mock_free_user.is_active = True
+
+        async def override_get_db():
+            yield mock_db
+
+        async def override_get_optional_user():
+            return mock_free_user
+
+        with patch(
+            "src.api.backtests._backtest_service.get_backtest",
+            new_callable=AsyncMock,
+            return_value=result,
+        ):
+            app.dependency_overrides[get_db] = override_get_db
+            app.dependency_overrides[get_optional_user] = override_get_optional_user
+            try:
+                response = await client.get("/api/v1/backtests/1")
+            finally:
+                app.dependency_overrides.clear()
+
+        assert response.status_code == 200
+        data = response.json()["data"]
+        assert data["total_return"] == pytest.approx(0.15)
+        assert data["trade_count"] == 50
+        assert data["max_drawdown"] == pytest.approx(0.10)
+        assert data.get("sharpe_ratio") is None
+        assert data.get("win_rate") is None
+
+    @pytest.mark.asyncio
+    async def test_vip2_user_sees_all_fields_in_backtest_detail(
+        self, client: AsyncClient, app
+    ) -> None:
+        """VIP2 用户访问回测详情：所有字段均可见（sharpe_ratio / win_rate 有值）。"""
+        from src.core.deps import get_db, get_optional_user
+        from src.core.enums import MembershipTier
+
+        result = _make_mock_backtest_result()
+        mock_db = _make_mock_db()
+
+        mock_vip2_user = MagicMock()
+        mock_vip2_user.membership = MembershipTier.VIP2
+        mock_vip2_user.is_active = True
+
+        async def override_get_db():
+            yield mock_db
+
+        async def override_get_optional_user():
+            return mock_vip2_user
+
+        with patch(
+            "src.api.backtests._backtest_service.get_backtest",
+            new_callable=AsyncMock,
+            return_value=result,
+        ):
+            app.dependency_overrides[get_db] = override_get_db
+            app.dependency_overrides[get_optional_user] = override_get_optional_user
+            try:
+                response = await client.get("/api/v1/backtests/1")
+            finally:
+                app.dependency_overrides.clear()
+
+        assert response.status_code == 200
+        data = response.json()["data"]
+        assert data["sharpe_ratio"] == pytest.approx(1.5)
+        assert data["win_rate"] == pytest.approx(0.60)
+        assert data["total_return"] == pytest.approx(0.15)
+        assert data["trade_count"] == 50
+
+    @pytest.mark.asyncio
+    async def test_non_integer_backtest_id_returns_422(
+        self, client: AsyncClient, app
+    ) -> None:
+        """非整数回测 ID /backtests/abc 返回 HTTP 422，不应触发 500。"""
+        from src.core.deps import get_db
+
+        mock_db = _make_mock_db()
+
+        async def override_get_db():
+            yield mock_db
+
+        app.dependency_overrides[get_db] = override_get_db
+        try:
+            response = await client.get("/api/v1/backtests/abc")
+        finally:
+            app.dependency_overrides.clear()
+
+        assert response.status_code == 422
+
+    @pytest.mark.asyncio
+    async def test_backtest_detail_bad_token_treated_as_anonymous(
+        self, client: AsyncClient, app
+    ) -> None:
+        """携带无效 token 访问回测详情时，软鉴权静默降级为匿名，返回 HTTP 200。"""
+        from src.core.deps import get_db
+
+        result = _make_mock_backtest_result()
+        mock_db = _make_mock_db()
+
+        async def override_get_db():
+            yield mock_db
+
+        with patch(
+            "src.api.backtests._backtest_service.get_backtest",
+            new_callable=AsyncMock,
+            return_value=result,
+        ):
+            app.dependency_overrides[get_db] = override_get_db
+            try:
+                response = await client.get(
+                    "/api/v1/backtests/1",
+                    headers={"Authorization": "Bearer bad.token.here"},
+                )
+            finally:
+                app.dependency_overrides.clear()
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["code"] == 0
+        # 匿名降级：VIP 字段应为 null
+        data = body["data"]
+        assert data.get("sharpe_ratio") is None
+        assert data.get("win_rate") is None

@@ -5,23 +5,44 @@
 
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from src.core.enums import MembershipTier
+from src.utils.email_validator import EmailValidator
 
 
 class RegisterRequest(BaseModel):
-    """注册请求体 Schema。"""
+    """注册请求体 Schema（任务 4.1）。
 
-    username: str = Field(..., min_length=1, max_length=64, description="用户名")
-    password: str = Field(..., min_length=6, max_length=128, description="密码")
+    将 username 字段替换为 email 字段，密码最低长度从 6 升级为 8。
+    邮箱格式校验通过 EmailValidator 在 Pydantic 解析阶段自动触发。
+    """
+
+    email: str = Field(..., max_length=254, description="注册邮箱")
+    password: str = Field(..., min_length=8, max_length=128, description="密码，至少8个字符")
+
+    @field_validator("email")
+    @classmethod
+    def validate_email_field(cls, v: str) -> str:
+        """调用 EmailValidator 校验并归一化邮箱地址。"""
+        return EmailValidator.validate(v)
 
 
 class LoginRequest(BaseModel):
-    """登录请求体 Schema。"""
+    """登录请求体 Schema（任务 4.2）。
 
-    username: str = Field(..., description="用户名")
+    将 username 字段替换为 email 字段。
+    邮箱格式校验通过 EmailValidator 在 Pydantic 解析阶段自动触发。
+    """
+
+    email: str = Field(..., description="登录邮箱")
     password: str = Field(..., description="密码")
+
+    @field_validator("email")
+    @classmethod
+    def validate_email_field(cls, v: str) -> str:
+        """调用 EmailValidator 校验并归一化邮箱地址。"""
+        return EmailValidator.validate(v)
 
 
 class RefreshRequest(BaseModel):
@@ -31,10 +52,13 @@ class RefreshRequest(BaseModel):
 
 
 class UserRead(BaseModel):
-    """用户信息响应 Schema（注册成功时返回）。"""
+    """用户信息响应 Schema（注册成功时返回，任务 4.2）。
+
+    将 username 字段替换为 email 字段，仅暴露安全字段。
+    """
 
     id: int
-    username: str
+    email: str
     membership: MembershipTier
     created_at: datetime | None = None
 

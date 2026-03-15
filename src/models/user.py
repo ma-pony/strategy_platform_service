@@ -19,11 +19,11 @@ class User(Base, TimestampMixin):
 
     __tablename__ = "users"
 
-    __table_args__ = (Index("idx_users_username", "username"),)
+    __table_args__ = (Index("idx_users_email", "email"),)
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    username: Mapped[str] = mapped_column(
-        String(64), unique=True, nullable=False, index=True
+    email: Mapped[str] = mapped_column(
+        String(254), unique=True, nullable=False, index=True
     )
     hashed_password: Mapped[str] = mapped_column(String(256), nullable=False)
     membership: Mapped[MembershipTier] = mapped_column(

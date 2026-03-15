@@ -178,7 +178,7 @@ class TestFastAPIAppEndpoints:
 
         from src.api.main_router import create_app
         from src.core.deps import get_db
-        from src.core.exceptions import AuthenticationError
+        from src.core.exceptions import LoginNotFoundError
 
         app = create_app()
         mock_db = AsyncMock()
@@ -194,14 +194,14 @@ class TestFastAPIAppEndpoints:
         async with AsyncClient(
             transport=ASGITransport(app=app), base_url="http://test"
         ) as ac:
-            # 使用不存在的用户登录触发 AuthenticationError
+            # 使用不存在的邮箱登录触发 LoginNotFoundError
             response = await ac.post(
                 "/api/v1/auth/login",
-                json={"username": "ghost", "password": "wrong"},
+                json={"email": "ghost@example.com", "password": "wrong"},
             )
 
         assert response.status_code == 401
         body = response.json()
-        assert body["code"] == 1001
+        assert body["code"] == 1004
         assert "message" in body
         assert body["data"] is None

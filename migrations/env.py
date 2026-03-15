@@ -26,11 +26,12 @@ if config.config_file_name is not None:
 # target_metadata 指向 Base.metadata，供 autogenerate 使用
 target_metadata = Base.metadata
 
-# 从 pydantic-settings 配置中读取同步数据库 URL
-from src.core.app_settings import get_settings
+# 从 pydantic-settings 配置中读取同步数据库 URL（仅在未通过代码设置时）
+if not config.get_main_option("sqlalchemy.url"):
+    from src.core.app_settings import get_settings
 
-_settings = get_settings()
-config.set_main_option("sqlalchemy.url", _settings.database_sync_url)
+    _settings = get_settings()
+    config.set_main_option("sqlalchemy.url", _settings.database_sync_url)
 
 
 def run_migrations_offline() -> None:

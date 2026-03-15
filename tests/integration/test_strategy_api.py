@@ -401,6 +401,240 @@ class TestStrategyDetailEndpoint:
         assert item["max_drawdown"] == pytest.approx(0.08)
 
 
+class TestStrategyListFieldVisibility:
+    """GET /api/v1/strategies 列表接口字段可见性补充测试（审计批次 1）。"""
+
+    @pytest.mark.asyncio
+    async def test_free_user_sees_free_fields_not_vip_in_list(
+        self, client: AsyncClient, app
+    ) -> None:
+        """Free 用户访问策略列表：trade_count / max_drawdown 可见，sharpe_ratio / win_rate 为 null。"""
+        from src.core.deps import get_db, get_optional_user
+        from src.core.enums import MembershipTier
+
+        strategy = _make_mock_strategy()
+        strategy.trade_count = 80
+        strategy.max_drawdown = 0.15
+        strategy.sharpe_ratio = 1.8
+        strategy.win_rate = 0.55
+        mock_db = _make_mock_db()
+
+        mock_free_user = MagicMock()
+        mock_free_user.membership = MembershipTier.FREE
+        mock_free_user.is_active = True
+
+        async def override_get_db():
+            yield mock_db
+
+        async def override_get_optional_user():
+            return mock_free_user
+
+        with patch(
+            "src.api.strategies._strategy_service.list_strategies",
+            new_callable=AsyncMock,
+            return_value=([strategy], 1),
+        ):
+            app.dependency_overrides[get_db] = override_get_db
+            app.dependency_overrides[get_optional_user] = override_get_optional_user
+            try:
+                response = await client.get("/api/v1/strategies")
+            finally:
+                app.dependency_overrides.clear()
+
+        assert response.status_code == 200
+        item = response.json()["data"]["items"][0]
+        assert item["trade_count"] == 80
+        assert item["max_drawdown"] == pytest.approx(0.15)
+        assert item.get("sharpe_ratio") is None
+        assert item.get("win_rate") is None
+
+    @pytest.mark.asyncio
+    async def test_vip1_user_sees_all_fields_in_list(
+        self, client: AsyncClient, app
+    ) -> None:
+        """VIP1 用户访问策略列表：所有字段均可见。"""
+        from src.core.deps import get_db, get_optional_user
+        from src.core.enums import MembershipTier
+
+        strategy = _make_mock_strategy()
+        strategy.trade_count = 120
+        strategy.max_drawdown = 0.09
+        strategy.sharpe_ratio = 2.1
+        strategy.win_rate = 0.62
+        mock_db = _make_mock_db()
+
+        mock_vip1_user = MagicMock()
+        mock_vip1_user.membership = MembershipTier.VIP1
+        mock_vip1_user.is_active = True
+
+        async def override_get_db():
+            yield mock_db
+
+        async def override_get_optional_user():
+            return mock_vip1_user
+
+        with patch(
+            "src.api.strategies._strategy_service.list_strategies",
+            new_callable=AsyncMock,
+            return_value=([strategy], 1),
+        ):
+            app.dependency_overrides[get_db] = override_get_db
+            app.dependency_overrides[get_optional_user] = override_get_optional_user
+            try:
+                response = await client.get("/api/v1/strategies")
+            finally:
+                app.dependency_overrides.clear()
+
+        assert response.status_code == 200
+        item = response.json()["data"]["items"][0]
+        assert item["sharpe_ratio"] == pytest.approx(2.1)
+        assert item["win_rate"] == pytest.approx(0.62)
+        assert item["trade_count"] == 120
+        assert item["max_drawdown"] == pytest.approx(0.09)
+
+
+class TestStrategyListPaginationValidation:
+    """GET /api/v1/strategies 分页参数边界校验补充测试（审计批次 1）。"""
+
+    @pytest.mark.asyncio
+    async def test_page_zero_returns_422_code_2001(
+        self, client: AsyncClient, app
+    ) -> None:
+        """page=0 时返回 HTTP 422 + code:2001（页码最小值为 1）。"""
+        from src.core.deps import get_db
+
+        mock_db = _make_mock_db()
+
+        async def override_get_db():
+            yield mock_db
+
+        app.dependency_overrides[get_db] = override_get_db
+        try:
+            response = await client.get("/api/v1/strategies?page=0")
+        finally:
+            app.dependency_overrides.clear()
+
+        assert response.status_code == 422
+        body = response.json()
+        assert body["code"] == 2001
+
+    @pytest.mark.asyncio
+    async def test_page_size_zero_returns_422_code_2001(
+        self, client: AsyncClient, app
+    ) -> None:
+        """page_size=0 时返回 HTTP 422 + code:2001（每页条数最小值为 1）。"""
+        from src.core.deps import get_db
+
+        mock_db = _make_mock_db()
+
+        async def override_get_db():
+            yield mock_db
+
+        app.dependency_overrides[get_db] = override_get_db
+        try:
+            response = await client.get("/api/v1/strategies?page_size=0")
+        finally:
+            app.dependency_overrides.clear()
+
+        assert response.status_code == 422
+        body = response.json()
+        assert body["code"] == 2001
+
+
+class TestStrategyListSoftAuth:
+    """GET /api/v1/strategies 软鉴权场景补充测试（审计批次 1）。"""
+
+    @pytest.mark.asyncio
+    async def test_invalid_token_treated_as_anonymous_returns_200(
+        self, client: AsyncClient, app
+    ) -> None:
+        """携带签名无效 token 时，接口静默降级为匿名访问，返回 HTTP 200 + 基础字段。"""
+        from src.core.deps import get_db
+
+        mock_db = _make_mock_db()
+
+        async def override_get_db():
+            yield mock_db
+
+        with patch(
+            "src.api.strategies._strategy_service.list_strategies",
+            new_callable=AsyncMock,
+            return_value=([], 0),
+        ):
+            app.dependency_overrides[get_db] = override_get_db
+            try:
+                response = await client.get(
+                    "/api/v1/strategies",
+                    headers={"Authorization": "Bearer this.is.an.invalid.token"},
+                )
+            finally:
+                app.dependency_overrides.clear()
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["code"] == 0
+        assert "items" in body["data"]
+
+
+class TestStrategyDetailSoftAuth:
+    """GET /api/v1/strategies/{id} 软鉴权及路径参数校验补充测试（审计批次 1）。"""
+
+    @pytest.mark.asyncio
+    async def test_non_integer_path_param_returns_422(
+        self, client: AsyncClient, app
+    ) -> None:
+        """非整数路径参数 /strategies/abc 返回 HTTP 422，不应触发 500。"""
+        from src.core.deps import get_db
+
+        mock_db = _make_mock_db()
+
+        async def override_get_db():
+            yield mock_db
+
+        app.dependency_overrides[get_db] = override_get_db
+        try:
+            response = await client.get("/api/v1/strategies/abc")
+        finally:
+            app.dependency_overrides.clear()
+
+        assert response.status_code == 422
+
+    @pytest.mark.asyncio
+    async def test_bad_token_silently_treated_as_anonymous_in_detail(
+        self, client: AsyncClient, app
+    ) -> None:
+        """携带无效 token 访问策略详情时，软鉴权静默降级为匿名，返回 HTTP 200。"""
+        from src.core.deps import get_db
+
+        strategy = _make_mock_strategy()
+        mock_db = _make_mock_db()
+
+        async def override_get_db():
+            yield mock_db
+
+        with patch(
+            "src.api.strategies._strategy_service.get_strategy",
+            new_callable=AsyncMock,
+            return_value=strategy,
+        ):
+            app.dependency_overrides[get_db] = override_get_db
+            try:
+                response = await client.get(
+                    "/api/v1/strategies/1",
+                    headers={"Authorization": "Bearer bad.token.here"},
+                )
+            finally:
+                app.dependency_overrides.clear()
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["code"] == 0
+        # 匿名用户看不到 VIP 字段
+        item = body["data"]
+        assert item.get("sharpe_ratio") is None
+        assert item.get("win_rate") is None
+
+
 class TestStrategyListDefaultPagination:
     """策略列表默认分页参数验证（需求 2.4）。"""
 

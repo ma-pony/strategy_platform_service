@@ -17,9 +17,12 @@ from typing import Any
 
 import structlog
 from celery import shared_task
+from sqlalchemy.orm import Session
 
+from src.core.enums import DataSource
 from src.freqtrade_bridge.exceptions import FreqtradeExecutionError
 from src.freqtrade_bridge.signal_fetcher import fetch_signals_sync
+from src.services.pair_metrics_service import upsert_pair_metrics
 from src.workers.db import SyncSessionLocal
 from src.workers.redis_client import get_redis_client
 
@@ -119,6 +122,17 @@ def generate_signals_task(strategy_id: int, pair: str) -> None:
             duration_ms=elapsed_ms,
         )
 
+    # 持久化完成后，非阻塞更新实盘绩效指标（需求 3.1, 3.4）
+    # 使用信号中携带的 timeframe，默认 "1h"
+    signal_timeframe = "1h"
+    if signals_list:
+        signal_timeframe = signals_list[0].get("timeframe") or "1h"
+    try_upsert_live_metrics(
+        strategy_id=strategy_id,
+        pair=pair,
+        timeframe=signal_timeframe,
+    )
+
 
 def _persist_signals_to_db(
     strategy_id: int,
@@ -206,6 +220,183 @@ def _persist_signals_to_db(
                 error=str(exc),
                 timestamp=datetime.datetime.now(tz=datetime.timezone.utc).isoformat(),
                 exc_info=True,
+            )
+
+
+def compute_live_metrics(
+    session: Session,
+    strategy_id: int,
+    pair: str,
+    timeframe: str,
+) -> dict[str, float | int | None]:
+    """从 trading_signals 历史计算实盘滚动绩效指标。
+
+    查询最近 200 条 (strategy_id, pair, timeframe) 匹配的信号记录，
+    基于信号方向和置信度估算五个绩效指标（估算值，非精确交易绩效）。
+
+    历史数据不足 5 条时，所有指标返回 None。
+
+    Args:
+        session: 同步 SQLAlchemy Session
+        strategy_id: 策略 ID
+        pair: 交易对（如 "BTC/USDT"）
+        timeframe: 时间周期（如 "1h"）
+
+    Returns:
+        含 total_return、profit_factor、max_drawdown、sharpe_ratio、trade_count 的字典
+    """
+    from sqlalchemy import select, text
+    from src.models.signal import TradingSignal
+
+    stmt = (
+        select(TradingSignal.direction, TradingSignal.confidence_score)
+        .where(
+            TradingSignal.strategy_id == strategy_id,
+            TradingSignal.pair == pair,
+            TradingSignal.timeframe == timeframe,
+        )
+        .order_by(TradingSignal.signal_at.desc())
+        .limit(200)
+    )
+
+    rows = session.execute(stmt).fetchall()
+
+    _null_result: dict[str, float | int | None] = {
+        "total_return": None,
+        "profit_factor": None,
+        "max_drawdown": None,
+        "sharpe_ratio": None,
+        "trade_count": None,
+    }
+
+    if len(rows) < 5:
+        return _null_result
+
+    # 解析方向和置信度
+    directions = [str(row.direction) for row in rows]
+    confidences = [float(row.confidence_score or 0.0) for row in rows]
+
+    # trade_count：非 hold 方向信号数（精确值）
+    non_hold = [(d, c) for d, c in zip(directions, confidences) if d != "hold"]
+    trade_count: int = len(non_hold)
+
+    # profit_factor：buy 置信度总和 / sell 置信度总和（近似盈亏比）
+    buy_conf_sum = sum(c for d, c in non_hold if d == "buy")
+    sell_conf_sum = sum(c for d, c in non_hold if d == "sell")
+    profit_factor: float | None = (
+        buy_conf_sum / sell_conf_sum if sell_conf_sum > 0 else None
+    )
+
+    # total_return：buy 方向信号置信度加权简化累计收益估算
+    total_return: float | None = buy_conf_sum - sell_conf_sum
+
+    # sharpe_ratio：置信度序列均值 / 标准差近似
+    if len(confidences) > 1:
+        import statistics
+        mean_conf = statistics.mean(confidences)
+        stdev_conf = statistics.stdev(confidences)
+        sharpe_ratio: float | None = (mean_conf / stdev_conf) if stdev_conf > 0 else None
+    else:
+        sharpe_ratio = None
+
+    # max_drawdown：方向序列最大连续负序列归一化简化估算
+    max_drawdown: float | None = _compute_max_drawdown(directions)
+
+    return {
+        "total_return": total_return,
+        "profit_factor": profit_factor,
+        "max_drawdown": max_drawdown,
+        "sharpe_ratio": sharpe_ratio,
+        "trade_count": trade_count,
+    }
+
+
+def _compute_max_drawdown(directions: list[str]) -> float | None:
+    """简化估算最大回撤：累计方向序列最大连续负序长度归一化。
+
+    将 sell 视为 -1，buy 视为 +1，hold 视为 0，
+    计算累计序列的最大回撤深度（归一化到 [0, 1]）。
+
+    Args:
+        directions: 信号方向列表（"buy"/"sell"/"hold"）
+
+    Returns:
+        估算最大回撤值（正数），或 None
+    """
+    if not directions:
+        return None
+
+    cumulative = 0.0
+    peak = 0.0
+    max_dd = 0.0
+
+    for d in directions:
+        if d == "buy":
+            cumulative += 1
+        elif d == "sell":
+            cumulative -= 1
+        # hold 不影响
+
+        if cumulative > peak:
+            peak = cumulative
+        drawdown = (peak - cumulative) / max(abs(peak), 1.0)
+        if drawdown > max_dd:
+            max_dd = drawdown
+
+    return max_dd if max_dd > 0 else None
+
+
+def try_upsert_live_metrics(
+    strategy_id: int,
+    pair: str,
+    timeframe: str,
+) -> None:
+    """非阻塞实盘指标更新封装。
+
+    在 _persist_signals_to_db() 完成后调用。使用独立的 SyncSessionLocal() session，
+    避免污染信号写入事务。全部逻辑包裹在 try/except Exception，
+    失败时记录 structlog ERROR（含 strategy_id、pair、timeframe、error_message），
+    不向上抛出，保证不阻塞信号生成主流程（需求 3.4）。
+
+    成功时自行 session.commit()，data_source 设置为 DataSource.LIVE（需求 3.2）。
+
+    Args:
+        strategy_id: 策略 ID
+        pair: 交易对（如 "BTC/USDT"）
+        timeframe: 时间周期（如 "1h"）
+    """
+    with SyncSessionLocal() as session:
+        try:
+            metrics = compute_live_metrics(
+                session=session,
+                strategy_id=strategy_id,
+                pair=pair,
+                timeframe=timeframe,
+            )
+
+            upsert_pair_metrics(
+                session=session,
+                strategy_id=strategy_id,
+                pair=pair,
+                timeframe=timeframe,
+                total_return=metrics.get("total_return"),
+                profit_factor=metrics.get("profit_factor"),
+                max_drawdown=metrics.get("max_drawdown"),
+                sharpe_ratio=metrics.get("sharpe_ratio"),
+                trade_count=metrics.get("trade_count"),  # type: ignore[arg-type]
+                data_source=DataSource.LIVE,
+                last_updated_at=datetime.datetime.now(tz=datetime.timezone.utc),
+            )
+
+            session.commit()
+
+        except Exception as exc:
+            logger.error(
+                "实盘指标更新失败（非阻塞），不中断信号任务主流程",
+                strategy_id=strategy_id,
+                pair=pair,
+                timeframe=timeframe,
+                error_message=str(exc),
             )
 
 

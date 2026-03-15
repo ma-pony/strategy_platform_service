@@ -299,6 +299,132 @@ class TestSignalListEndpoint:
         assert "signal_at" in item
 
 
+class TestSignalVip2FieldVisibility:
+    """GET /api/v1/strategies/{id}/signals VIP2 字段可见性补充测试（审计批次 1）。"""
+
+    @pytest.mark.asyncio
+    async def test_vip2_user_sees_confidence_score(
+        self, client: AsyncClient, app
+    ) -> None:
+        """VIP2 用户信号响应中应包含 confidence_score（与 VIP1 相同权限）。"""
+        from src.core.deps import get_db, get_optional_user
+        from src.core.enums import MembershipTier
+
+        mock_db = _make_mock_db()
+        signals = [_make_mock_signal(id=1, confidence_score=0.92)]
+        last_updated = datetime(2024, 1, 1, 12, 0, tzinfo=timezone.utc)
+
+        mock_vip2_user = MagicMock()
+        mock_vip2_user.membership = MembershipTier.VIP2
+        mock_vip2_user.is_active = True
+
+        async def override_get_db():
+            yield mock_db
+
+        async def override_get_optional_user():
+            return mock_vip2_user
+
+        with patch(
+            "src.api.signals._signal_service.get_signals",
+            new_callable=AsyncMock,
+            return_value=(signals, last_updated),
+        ):
+            app.dependency_overrides[get_db] = override_get_db
+            app.dependency_overrides[get_optional_user] = override_get_optional_user
+            try:
+                response = await client.get("/api/v1/strategies/1/signals")
+            finally:
+                app.dependency_overrides.clear()
+
+        assert response.status_code == 200
+        item = response.json()["data"]["signals"][0]
+        assert item["confidence_score"] == pytest.approx(0.92)
+
+
+class TestSignalLimitValidation:
+    """GET /api/v1/strategies/{id}/signals limit 参数边界校验补充测试（审计批次 1）。"""
+
+    @pytest.mark.asyncio
+    async def test_limit_zero_returns_422_code_2001(
+        self, client: AsyncClient, app
+    ) -> None:
+        """limit=0 时返回 HTTP 422 + code:2001（最小值校验）。"""
+        from src.core.deps import get_db
+
+        mock_db = _make_mock_db()
+
+        async def override_get_db():
+            yield mock_db
+
+        app.dependency_overrides[get_db] = override_get_db
+        try:
+            response = await client.get("/api/v1/strategies/1/signals?limit=0")
+        finally:
+            app.dependency_overrides.clear()
+
+        assert response.status_code == 422
+        body = response.json()
+        assert body["code"] == 2001
+
+    @pytest.mark.asyncio
+    async def test_limit_exceeds_max_returns_422_code_2001(
+        self, client: AsyncClient, app
+    ) -> None:
+        """limit=200（超过上限）时返回 HTTP 422 + code:2001。"""
+        from src.core.deps import get_db
+
+        mock_db = _make_mock_db()
+
+        async def override_get_db():
+            yield mock_db
+
+        app.dependency_overrides[get_db] = override_get_db
+        try:
+            response = await client.get("/api/v1/strategies/1/signals?limit=200")
+        finally:
+            app.dependency_overrides.clear()
+
+        assert response.status_code == 422
+        body = response.json()
+        assert body["code"] == 2001
+
+
+class TestSignalSoftAuth:
+    """GET /api/v1/strategies/{id}/signals 软鉴权场景补充测试（审计批次 1）。"""
+
+    @pytest.mark.asyncio
+    async def test_bad_token_treated_as_anonymous_returns_200(
+        self, client: AsyncClient, app
+    ) -> None:
+        """携带无效 token 时，软鉴权静默降级为匿名，信号接口返回 HTTP 200。"""
+        from src.core.deps import get_db
+
+        mock_db = _make_mock_db()
+        last_updated = datetime(2024, 1, 1, 12, 0, tzinfo=timezone.utc)
+
+        async def override_get_db():
+            yield mock_db
+
+        with patch(
+            "src.api.signals._signal_service.get_signals",
+            new_callable=AsyncMock,
+            return_value=([], last_updated),
+        ):
+            app.dependency_overrides[get_db] = override_get_db
+            try:
+                response = await client.get(
+                    "/api/v1/strategies/1/signals",
+                    headers={"Authorization": "Bearer this.is.an.invalid.token"},
+                )
+            finally:
+                app.dependency_overrides.clear()
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["code"] == 0
+        assert "signals" in body["data"]
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # 任务 7.1：空缓存保护验证（需求 4.1, 4.4）
 # 任务 7.2：P95 性能测试占位（需求 4.5）

@@ -53,7 +53,7 @@ def _make_session_factory(mock_session):
 
 def _make_mock_strategy(
     strategy_id: int = 1,
-    name: str = "TurtleTrading",
+    name: str = "TurtleTradingStrategy",
     trade_count=None,
     max_drawdown=None,
     sharpe_ratio=None,
@@ -123,7 +123,7 @@ def _make_registry_entry(file_exists: bool = False):
     mock_file_path.exists.return_value = file_exists
     mock_file_path.name = "turtle_trading.py"
     return {
-        "class_name": "TurtleTrading",
+        "class_name": "TurtleTradingStrategy",
         "file_path": mock_file_path,
     }
 

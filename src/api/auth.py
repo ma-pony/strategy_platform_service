@@ -39,7 +39,7 @@ async def register(
     - 用户名重复：返回 code:2001 HTTP 400
     - 参数校验失败：返回 code:2001 HTTP 422
     """
-    user = await _auth_service.register(db, body.username, body.password)
+    user = await _auth_service.register(db, body.email, body.password)
     user_read = UserRead.model_validate(user)
     return ok(data=user_read)
 
@@ -60,7 +60,7 @@ async def login(
     - 凭证错误：返回 code:1001 HTTP 401
     """
     access_token, refresh_token = await _auth_service.login(
-        db, body.username, body.password
+        db, body.email, body.password
     )
     return ok(data=TokenPair(access_token=access_token, refresh_token=refresh_token))
 

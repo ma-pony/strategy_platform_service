@@ -36,3 +36,15 @@ class SignalDirection(str, Enum):
     BUY = "buy"
     SELL = "sell"
     HOLD = "hold"
+
+
+class DataSource(str, Enum):
+    """绩效指标数据来源枚举。
+
+    标识策略对绩效指标的最后一次更新来源：
+    - BACKTEST：来自 freqtrade 回测任务结果（精确数据）
+    - LIVE：来自实盘信号历史的滚动统计估算（估算数据）
+    """
+
+    BACKTEST = "backtest"
+    LIVE = "live"

@@ -77,7 +77,7 @@ class TestPersistSignalsWithAllFields:
                 strategy_id=1,
                 pair="BTC/USDT",
                 signals_data=full_signals_data,
-                strategy_name="TurtleTrading",
+                strategy_name="TurtleTradingStrategy",
             )
 
         assert len(added_records) == 1
@@ -103,7 +103,7 @@ class TestPersistSignalsWithAllFields:
                 strategy_id=1,
                 pair="BTC/USDT",
                 signals_data=full_signals_data,
-                strategy_name="TurtleTrading",
+                strategy_name="TurtleTradingStrategy",
             )
 
         record = added_records[0]
@@ -133,7 +133,7 @@ class TestPersistSignalsWithAllFields:
                 strategy_id=1,
                 pair="BTC/USDT",
                 signals_data=full_signals_data,
-                strategy_name="TurtleTrading",
+                strategy_name="TurtleTradingStrategy",
             )
 
         # add 被调用，execute 不被调用（execute 通常用于 UPDATE/DELETE）

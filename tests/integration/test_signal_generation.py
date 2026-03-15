@@ -254,7 +254,10 @@ class TestTradingSignalsAppendOnly:
         mock_session.delete.assert_not_called()
 
     def test_no_update_statement_executed(self, env_setup) -> None:
-        """session.execute() 不应执行任何 UPDATE 语句。"""
+        """trading_signals 表不应执行任何 UPDATE 或 DELETE 语句（只追加写入）。
+
+        注：strategy_pair_metrics 的 ON CONFLICT DO UPDATE 语句是预期行为，不影响此断言。
+        """
         from src.workers.tasks.signal_tasks import generate_signals_task
 
         mock_session = _make_mock_session()
@@ -273,8 +276,12 @@ class TestTradingSignalsAppendOnly:
                     generate_signals_task(strategy_id=1, pair="BTC/USDT")
 
         for stmt_str in executed_stmts:
-            assert "UPDATE" not in stmt_str.upper(), f"不应执行 UPDATE 语句：{stmt_str}"
-            assert "DELETE" not in stmt_str.upper(), f"不应执行 DELETE 语句：{stmt_str}"
+            stmt_upper = stmt_str.upper()
+            # trading_signals 表不应执行 UPDATE/DELETE
+            # strategy_pair_metrics 的 ON CONFLICT DO UPDATE 是预期行为（幂等 upsert）
+            if "TRADING_SIGNALS" in stmt_upper:
+                assert "UPDATE" not in stmt_upper, f"trading_signals 不应执行 UPDATE：{stmt_str}"
+                assert "DELETE" not in stmt_upper, f"trading_signals 不应执行 DELETE：{stmt_str}"
 
     def test_only_add_and_commit_called(self, env_setup) -> None:
         """信号持久化时只调用 session.add() 和 session.commit()，不调用 delete。"""
@@ -345,7 +352,7 @@ class TestSignalQueryOrder:
         """带认证的 app（注入普通用户）。"""
         from src.core.deps import get_current_user
         user = SimpleNamespace(
-            id=1, username="testuser", membership="vip1", is_active=True, is_admin=False
+            id=1, email="testuser@example.com", membership="vip1", is_active=True, is_admin=False
         )
         app.dependency_overrides[get_current_user] = lambda: user
         yield app
@@ -403,7 +410,7 @@ class TestSignalQueryOrder:
 
         # 按 signal_at 降序排列（SignalService._get_signals_from_db 使用 signal_at.desc()）
         sorted_signals = [signal_latest, signal_newer, signal_older]
-        mock_strategy = SimpleNamespace(id=1, name="TurtleTrading")
+        mock_strategy = SimpleNamespace(id=1, name="TurtleTradingStrategy")
 
         with patch(
             "src.services.signal_service.SignalService.get_signals",
@@ -433,7 +440,7 @@ class TestSignalQueryOrder:
 
         # mock strategy 查询结果
         strategy_exec_result = MagicMock()
-        strategy_exec_result.scalar_one_or_none.return_value = SimpleNamespace(id=1, name="TurtleTrading")
+        strategy_exec_result.scalar_one_or_none.return_value = SimpleNamespace(id=1, name="TurtleTradingStrategy")
 
         # mock signal 查询结果（空列表）
         signal_exec_result = MagicMock()
@@ -454,6 +461,136 @@ class TestSignalQueryOrder:
             query_str = str(query_stmt).upper()
             assert "ORDER BY" in query_str, "信号查询应包含 ORDER BY 子句"
             assert "DESC" in query_str, "信号查询应按降序排列"
+
+
+class TestSignalFetcherShortSignalsIntegration:
+    """验证实时信号获取路径正确处理做空信号、止损止盈方向、置信度。"""
+
+    def _run_fetcher_with_df(self, df):
+        """用指定 df 运行 _fetch_signals_sync 并返回信号。"""
+        from pathlib import Path
+        from src.freqtrade_bridge.signal_fetcher import _fetch_signals_sync
+
+        entry = {"class_name": "MockStrategy", "file_path": Path("/fake")}
+        with patch("src.freqtrade_bridge.signal_fetcher._lookup_strategy", return_value=entry):
+            with patch("src.freqtrade_bridge.signal_fetcher._load_strategy_class", return_value=MagicMock()):
+                with patch("src.freqtrade_bridge.signal_fetcher._build_ohlcv_dataframe", return_value=df):
+                    with patch("src.freqtrade_bridge.signal_fetcher._run_strategy_on_df", return_value=df):
+                        return _fetch_signals_sync("MockStrategy", "BTC/USDT")
+
+    def _make_df(self, n=50, **last_row_overrides):
+        import numpy as np
+        rng = np.random.default_rng(42)
+        import pandas as pd
+        closes = 30000.0 + rng.uniform(-500, 500, n).cumsum()
+        df = pd.DataFrame({
+            "date": pd.date_range("2025-01-01", periods=n, freq="1h"),
+            "open": closes * 0.999, "high": closes * 1.005,
+            "low": closes * 0.995, "close": closes,
+            "volume": rng.uniform(100, 1000, n),
+        })
+        df["atr"] = 100.0
+        df["volume_mean"] = 500.0
+        df["enter_long"] = 0
+        df["exit_long"] = 0
+        df["enter_short"] = 0
+        df["exit_short"] = 0
+        for col, val in last_row_overrides.items():
+            df.loc[df.index[-1], col] = val
+        return df
+
+    def test_enter_short_produces_sell_with_correct_sl_tp(self) -> None:
+        """enter_short=1 时 direction=sell, SL > entry, TP < entry。"""
+        df = self._make_df(enter_short=1)
+        result = self._run_fetcher_with_df(df)
+        sig = result["signals"][0]
+        assert sig["direction"] == "sell"
+        assert sig["stop_loss"] > sig["entry_price"], "sell SL 应在 entry 上方"
+        assert sig["take_profit"] < sig["entry_price"], "sell TP 应在 entry 下方"
+
+    def test_exit_short_produces_buy_with_correct_sl_tp(self) -> None:
+        """exit_short=1 时 direction=buy, SL < entry, TP > entry。"""
+        df = self._make_df(exit_short=1)
+        result = self._run_fetcher_with_df(df)
+        sig = result["signals"][0]
+        assert sig["direction"] == "buy"
+        assert sig["stop_loss"] < sig["entry_price"], "buy SL 应在 entry 下方"
+        assert sig["take_profit"] > sig["entry_price"], "buy TP 应在 entry 上方"
+
+    def test_entry_signal_strength_075_exit_050(self) -> None:
+        """入场信号 strength=0.75，出场信号 strength=0.50。"""
+        df_entry = self._make_df(enter_long=1)
+        df_exit = self._make_df(exit_long=1)
+        entry_sig = self._run_fetcher_with_df(df_entry)["signals"][0]
+        exit_sig = self._run_fetcher_with_df(df_exit)["signals"][0]
+        assert entry_sig["signal_strength"] == 0.75
+        assert exit_sig["signal_strength"] == 0.50
+
+    def test_confidence_varies_with_volume(self) -> None:
+        """高成交量信号置信度高于低成交量信号。"""
+        df_high = self._make_df(enter_long=1, volume_mean=10.0)  # volume >> volume_mean
+        df_low = self._make_df(enter_long=1, volume_mean=999999.0)  # volume << volume_mean
+        high_conf = self._run_fetcher_with_df(df_high)["signals"][0]["confidence_score"]
+        low_conf = self._run_fetcher_with_df(df_low)["signals"][0]["confidence_score"]
+        assert high_conf > low_conf
+
+    def test_hold_signal_zero_strength_and_confidence(self) -> None:
+        """无信号时 direction=hold, strength=0.0, confidence=0.0。"""
+        df = self._make_df()  # 无任何信号
+        sig = self._run_fetcher_with_df(df)["signals"][0]
+        assert sig["direction"] == "hold"
+        assert sig["signal_strength"] == 0.0
+        assert sig["confidence_score"] == 0.0
+
+    def test_sell_atr_values_correct(self) -> None:
+        """sell 方向 ATR=100 时 SL=entry+200, TP=entry-300。"""
+        df = self._make_df(enter_short=1, atr=100.0)
+        sig = self._run_fetcher_with_df(df)["signals"][0]
+        assert abs(sig["stop_loss"] - (sig["entry_price"] + 200.0)) < 0.01
+        assert abs(sig["take_profit"] - (sig["entry_price"] - 300.0)) < 0.01
+
+    def test_sell_fallback_sl_tp_without_atr(self) -> None:
+        """sell 方向无 ATR 时 SL=entry*1.03, TP=entry*0.95。"""
+        import math
+        df = self._make_df(enter_short=1, atr=float("nan"))
+        sig = self._run_fetcher_with_df(df)["signals"][0]
+        assert sig["stop_loss"] > sig["entry_price"]
+        assert sig["take_profit"] < sig["entry_price"]
+
+
+class TestBacktesterSignalsIntegration:
+    """验证回测路径 _trades_to_signals 无前瞻偏差。"""
+
+    def test_confidence_not_based_on_profit(self) -> None:
+        """不论利润大小，confidence 一致。"""
+        from src.freqtrade_bridge.backtester import _trades_to_signals
+        big_profit = _trades_to_signals([{"pair": "BTC/USDT", "is_short": False,
+            "profit_ratio": 0.50, "open_rate": 30000, "close_rate": 45000,
+            "stop_loss_abs": 28000, "stake_amount": 500, "open_date": "2025-01-01",
+            "exit_reason": "roi", "trade_duration": 100, "profit_abs": 500}])
+        big_loss = _trades_to_signals([{"pair": "BTC/USDT", "is_short": False,
+            "profit_ratio": -0.50, "open_rate": 30000, "close_rate": 15000,
+            "stop_loss_abs": 28000, "stake_amount": 500, "open_date": "2025-01-01",
+            "exit_reason": "stop_loss", "trade_duration": 50, "profit_abs": -500}])
+        assert big_profit[0]["confidence_score"] == big_loss[0]["confidence_score"]
+
+    def test_signal_strength_not_negative(self) -> None:
+        """signal_strength 不应为负数（之前直接用 profit_ratio 会负）。"""
+        from src.freqtrade_bridge.backtester import _trades_to_signals
+        result = _trades_to_signals([{"pair": "BTC/USDT", "is_short": False,
+            "profit_ratio": -0.15, "open_rate": 30000, "close_rate": 25500,
+            "stop_loss_abs": 28000, "stake_amount": 500, "open_date": "2025-01-01",
+            "exit_reason": "stop_loss", "trade_duration": 60, "profit_abs": -75}])
+        assert result[0]["signal_strength"] >= 0
+
+    def test_indicator_values_no_profit_abs(self) -> None:
+        """indicator_values 不含 profit_abs（避免暴露事后数据）。"""
+        from src.freqtrade_bridge.backtester import _trades_to_signals
+        result = _trades_to_signals([{"pair": "BTC/USDT", "is_short": False,
+            "profit_ratio": 0.05, "open_rate": 30000, "close_rate": 31500,
+            "stop_loss_abs": 28000, "stake_amount": 500, "open_date": "2025-01-01",
+            "exit_reason": "roi", "trade_duration": 120, "profit_abs": 25}])
+        assert "profit_abs" not in result[0]["indicator_values"]
 
 
 class TestSignalRedisCachePerformance:
@@ -489,7 +626,7 @@ class TestSignalRedisCachePerformance:
 
         mock_db = AsyncMock(spec=AsyncSession)
         strategy_result = MagicMock()
-        strategy_result.scalar_one_or_none.return_value = SimpleNamespace(id=1, name="TurtleTrading")
+        strategy_result.scalar_one_or_none.return_value = SimpleNamespace(id=1, name="TurtleTradingStrategy")
         mock_db.execute.return_value = strategy_result
 
         service = SignalService()
@@ -571,7 +708,7 @@ class TestSignalRedisCachePerformance:
 
         app = create_app()
         user = SimpleNamespace(
-            id=1, username="testuser", membership="vip1", is_active=True, is_admin=False
+            id=1, email="testuser@example.com", membership="vip1", is_active=True, is_admin=False
         )
         app.dependency_overrides[get_current_user] = lambda: user
 
@@ -591,7 +728,7 @@ class TestSignalRedisCachePerformance:
             "last_updated_at": "2024-03-15T10:00:00+00:00",
         }
 
-        mock_strategy = SimpleNamespace(id=1, name="TurtleTrading")
+        mock_strategy = SimpleNamespace(id=1, name="TurtleTradingStrategy")
         mock_signals = [
             SimpleNamespace(
                 id=1,

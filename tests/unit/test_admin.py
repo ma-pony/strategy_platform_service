@@ -162,7 +162,7 @@ class TestUserAdmin:
         assert UserAdmin.can_delete is False
 
     def test_user_admin_column_list_includes_required_fields(self) -> None:
-        """UserAdmin.column_list 应包含 username, membership, is_active, created_at。"""
+        """UserAdmin.column_list 应包含 email, membership, is_active, created_at（需求 3.5）。"""
         from src.admin.views import UserAdmin
 
         column_list = UserAdmin.column_list
@@ -174,13 +174,14 @@ class TestUserAdmin:
             elif isinstance(col, str):
                 column_names.append(col)
 
-        assert "username" in column_names
+        assert "email" in column_names
+        assert "username" not in column_names
         assert "membership" in column_names
         assert "is_active" in column_names
         assert "created_at" in column_names
 
-    def test_user_admin_search_includes_username(self) -> None:
-        """UserAdmin.column_searchable_list 应包含 username。"""
+    def test_user_admin_search_includes_email(self) -> None:
+        """UserAdmin.column_searchable_list 应包含 email（需求 3.5）。"""
         from src.admin.views import UserAdmin
 
         searchable = UserAdmin.column_searchable_list
@@ -191,7 +192,8 @@ class TestUserAdmin:
             elif isinstance(col, str):
                 search_names.append(col)
 
-        assert "username" in search_names
+        assert "email" in search_names
+        assert "username" not in search_names
 
     def test_user_admin_sortable_includes_created_at(self) -> None:
         """UserAdmin.column_sortable_list 应包含 created_at。"""
@@ -300,5 +302,5 @@ class TestSetupAdmin:
 
             # 验证 Admin 实例被创建
             assert mock_admin_cls.called
-            # 验证 add_view 被调用三次（UserAdmin、StrategyAdmin、ReportAdmin）
-            assert mock_admin_instance.add_view.call_count == 3
+            # 验证 add_view 被调用七次（User、Strategy、Report、TradingSignal、BacktestTask、BacktestResult、StrategyPairMetrics）
+            assert mock_admin_instance.add_view.call_count == 7

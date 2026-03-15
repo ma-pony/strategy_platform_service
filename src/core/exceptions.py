@@ -51,6 +51,20 @@ class MembershipError(AppError):
     default_message = "会员等级不足"
 
 
+class LoginNotFoundError(AppError):
+    """邮箱或密码错误（code=1004）。防止用户枚举，不区分具体原因。"""
+
+    code = 1004
+    default_message = "邮箱或密码错误"
+
+
+class AccountDisabledError(AppError):
+    """账号已被禁用（code=1005）。"""
+
+    code = 1005
+    default_message = "账号已被禁用"
+
+
 # ──────────────────────────────────────────────
 # 2000–2999  请求参数错误
 # ──────────────────────────────────────────────
@@ -80,6 +94,13 @@ class ConflictError(AppError):
 
     code = 3002
     default_message = "资源冲突"
+
+
+class EmailConflictError(AppError):
+    """邮箱已被注册（code=3010）。"""
+
+    code = 3010
+    default_message = "邮箱已被注册"
 
 
 class UnsupportedStrategyError(AppError):

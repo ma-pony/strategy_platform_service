@@ -3,8 +3,8 @@
 提供用户注册、登录和 token 刷新的业务逻辑。
 
 职责与约束：
-  - 注册时检查用户名唯一性，密码以 bcrypt 哈希存储
-  - 登录时校验 bcrypt 哈希，凭证错误时抛出 AuthenticationError(1001)
+  - 注册时检查邮箱唯一性，重复时抛出 EmailConflictError(3010)
+  - 登录时校验 bcrypt 哈希，凭证错误时抛出 LoginNotFoundError(1004)，账号禁用时抛出 AccountDisabledError(1005)
   - 刷新时校验 refresh_token 类型和有效性，签发新 access_token
   - 不依赖 FastAPI 或 HTTP 层，可独立测试
 """
@@ -12,7 +12,12 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.core.exceptions import AuthenticationError, ValidationError
+from src.core.exceptions import (
+    AccountDisabledError,
+    AuthenticationError,
+    EmailConflictError,
+    LoginNotFoundError,
+)
 from src.core.security import SecurityUtils
 from src.models.user import User
 
@@ -26,39 +31,39 @@ class AuthService:
     """
 
     async def register(
-        self, db: AsyncSession, username: str, password: str
+        self, db: AsyncSession, email: str, password: str
     ) -> User:
         """注册新用户。
 
         步骤：
-          1. 查询用户名是否已存在
+          1. 查询邮箱是否已存在
           2. 以 bcrypt 哈希存储密码
           3. 创建新用户（membership=FREE）
 
         Args:
             db: 异步数据库 session
-            username: 用户名（长度校验由 Schema 层负责）
+            email: 邮箱地址（格式校验由 Schema 层负责）
             password: 明文密码
 
         Returns:
             新创建的 User 对象
 
         Raises:
-            ValidationError: 用户名已存在（code=2001）
+            EmailConflictError: 邮箱已存在（code=3010）
         """
-        # 1. 检查用户名唯一性
-        stmt = select(User).where(User.username == username)
+        # 1. 检查邮箱唯一性
+        stmt = select(User).where(User.email == email)
         result = await db.execute(stmt)
         existing = result.scalar_one_or_none()
         if existing is not None:
-            raise ValidationError("用户名已被使用")
+            raise EmailConflictError()
 
         # 2. 哈希密码
         hashed_pw = _security.hash_password(password)
 
         # 3. 创建用户
         user = User(
-            username=username,
+            email=email,
             hashed_password=hashed_pw,
         )
         db.add(user)
@@ -67,7 +72,7 @@ class AuthService:
         return user
 
     async def login(
-        self, db: AsyncSession, username: str, password: str
+        self, db: AsyncSession, email: str, password: str
     ) -> tuple[str, str]:
         """用户登录，返回 (access_token, refresh_token) 元组。
 
@@ -79,27 +84,28 @@ class AuthService:
 
         Args:
             db: 异步数据库 session
-            username: 用户名
+            email: 邮箱地址
             password: 明文密码
 
         Returns:
             (access_token, refresh_token) 字符串元组
 
         Raises:
-            AuthenticationError: 用户不存在、密码错误或账户被禁用（code=1001）
+            LoginNotFoundError: 邮箱不存在或密码不匹配（code=1004）
+            AccountDisabledError: 账号已被禁用（code=1005）
         """
         # 1. 查询用户
-        stmt = select(User).where(User.username == username)
+        stmt = select(User).where(User.email == email)
         result = await db.execute(stmt)
         user = result.scalar_one_or_none()
 
-        # 2. 验证凭证（统一返回相同错误消息，防止用户名枚举攻击）
+        # 2. 验证凭证（统一返回相同错误码，防止邮箱枚举攻击）
         if user is None or not _security.verify_password(password, user.hashed_password):
-            raise AuthenticationError("用户名或密码错误")
+            raise LoginNotFoundError()
 
         # 3. 校验账户状态
         if not user.is_active:
-            raise AuthenticationError("用户账户已被禁用")
+            raise AccountDisabledError()
 
         # 4. 签发 token 对
         access_token = _security.create_access_token(

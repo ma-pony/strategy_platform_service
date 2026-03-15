@@ -28,10 +28,11 @@ from celery import shared_task
 from sqlalchemy import and_, select
 from sqlalchemy.orm import Session
 
-from src.core.enums import TaskStatus
+from src.core.enums import DataSource, TaskStatus
 from src.freqtrade_bridge.backtester import run_backtest_subprocess
 from src.freqtrade_bridge.exceptions import FreqtradeExecutionError, FreqtradeTimeoutError
 from src.freqtrade_bridge.runner import cleanup_task_dir, generate_config
+from src.services.pair_metrics_service import upsert_pair_metrics
 from src.workers.db import SyncSessionLocal
 
 logger = structlog.get_logger(__name__)
@@ -202,6 +203,30 @@ def run_backtest_task(self: Any, strategy_id: int) -> None:  # type: ignore[misc
             signals = backtest_output.get("signals", [])
             _insert_backtest_signals(session, strategy_id, signals)
 
+            # 11.5 在 commit 前写入策略对绩效指标（与 BacktestResult 同一事务，需求 2.5）
+            # 从策略配置获取 pair 和 timeframe（取第一个交易对）
+            pairs = strategy.pairs if hasattr(strategy, "pairs") and strategy.pairs else []
+            timeframe_val = (
+                strategy.config_params.get("timeframe", "1h")
+                if hasattr(strategy, "config_params") and strategy.config_params
+                else "1h"
+            )
+            backtest_output_full = {
+                "total_return": result_data.get("total_return"),
+                "profit_factor": backtest_output.get("profit_factor"),
+                "max_drawdown": result_data.get("max_drawdown"),
+                "sharpe_ratio": result_data.get("sharpe_ratio"),
+                "trade_count": result_data.get("trade_count"),
+            }
+            for _pair in (pairs if pairs else ["BTC/USDT"]):
+                _upsert_metrics_for_backtest(
+                    session=session,
+                    strategy_id=strategy_id,
+                    pair=_pair,
+                    timeframe=timeframe_val,
+                    backtest_output=backtest_output_full,
+                )
+
             # 12. 更新任务状态为 DONE
             task_record.status = TaskStatus.DONE
             session.commit()
@@ -250,6 +275,84 @@ def run_backtest_task(self: Any, strategy_id: int) -> None:  # type: ignore[misc
         finally:
             # 13. 无论成功或失败，清理临时目录
             cleanup_task_dir(task_dir)
+
+
+def _extract_pair_metrics_from_result(
+    backtest_output: dict[str, Any],
+) -> dict[str, float | int | None]:
+    """从回测输出字典中提取五个绩效指标字段。
+
+    total_return 映射自 backtest_output['total_return']（即 freqtrade profit_total）。
+    profit_factor 为独立字段，可为 None（缺失时不覆盖现有值，需求 2.3）。
+    其余字段若缺失也返回 None。
+
+    Args:
+        backtest_output: run_backtest_subprocess 返回的回测结果字典
+
+    Returns:
+        含五个指标键的字典，值可为 None
+    """
+
+    def _safe_float(val: Any) -> float | None:
+        if val is None:
+            return None
+        try:
+            return float(val)
+        except (TypeError, ValueError):
+            return None
+
+    def _safe_int(val: Any) -> int | None:
+        if val is None:
+            return None
+        try:
+            return int(val)
+        except (TypeError, ValueError):
+            return None
+
+    return {
+        "total_return": _safe_float(backtest_output.get("total_return")),
+        "profit_factor": _safe_float(backtest_output.get("profit_factor")),
+        "max_drawdown": _safe_float(backtest_output.get("max_drawdown")),
+        "sharpe_ratio": _safe_float(backtest_output.get("sharpe_ratio")),
+        "trade_count": _safe_int(backtest_output.get("trade_count")),
+    }
+
+
+def _upsert_metrics_for_backtest(
+    session: Session,
+    strategy_id: int,
+    pair: str,
+    timeframe: str,
+    backtest_output: dict[str, Any],
+) -> None:
+    """在回测任务状态变更为 DONE 前，将绩效指标 upsert 至 strategy_pair_metrics 表。
+
+    在调用方的同一 session 中执行，不自行 commit，保证与 BacktestResult 写入的原子性（需求 2.5）。
+
+    data_source 固定为 DataSource.BACKTEST，last_updated_at 为当前 UTC 时间（需求 2.2）。
+
+    Args:
+        session: 调用方的同步 SQLAlchemy Session
+        strategy_id: 策略 ID
+        pair: 交易对（如 "BTC/USDT"）
+        timeframe: 时间周期（如 "1h"）
+        backtest_output: run_backtest_subprocess 返回的回测结果字典
+    """
+    metrics = _extract_pair_metrics_from_result(backtest_output)
+
+    upsert_pair_metrics(
+        session=session,
+        strategy_id=strategy_id,
+        pair=pair,
+        timeframe=timeframe,
+        total_return=metrics.get("total_return"),
+        profit_factor=metrics.get("profit_factor"),
+        max_drawdown=metrics.get("max_drawdown"),
+        sharpe_ratio=metrics.get("sharpe_ratio"),
+        trade_count=metrics.get("trade_count"),  # type: ignore[arg-type]
+        data_source=DataSource.BACKTEST,
+        last_updated_at=datetime.datetime.now(tz=datetime.timezone.utc),
+    )
 
 
 def _update_strategy_metrics(strategy: Any, result_data: dict[str, Any]) -> None:

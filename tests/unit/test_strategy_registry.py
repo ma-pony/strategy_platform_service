@@ -11,16 +11,16 @@ class TestStrategyRegistry:
 
     # 全部十个有效策略名
     VALID_STRATEGIES = [
-        "TurtleTrading",
-        "BollingerMeanReversion",
-        "RsiMeanReversion",
-        "MacdTrend",
-        "IchimokuTrend",
-        "ParabolicSarTrend",
-        "KeltnerBreakout",
-        "AroonTrend",
-        "Nr7Breakout",
-        "StochasticReversal",
+        "TurtleTradingStrategy",
+        "BollingerBandMeanReversionStrategy",
+        "RsiMeanReversionStrategy",
+        "MacdTrendFollowingStrategy",
+        "IchimokuCloudTrendStrategy",
+        "ParabolicSarTrendStrategy",
+        "KeltnerChannelBreakoutStrategy",
+        "AroonTrendSystemStrategy",
+        "Nr7VolatilityContractionBreakoutStrategy",
+        "StochasticOscillatorReversalStrategy",
     ]
 
     def test_registry_contains_ten_strategies(self) -> None:
