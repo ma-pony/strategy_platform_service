@@ -18,7 +18,7 @@ from httpx import ASGITransport, AsyncClient
 
 from src.core.deps import get_current_user, get_db
 
-TEST_SECRET = "test-secret-key-for-admin-report-api-256bits-long!!"
+TEST_SECRET = "test-secret-key-for-admin-report-api-256bits-long!!"  # pragma: allowlist secret
 
 
 @pytest.fixture()
@@ -84,7 +84,7 @@ def _make_mock_report(
 
 
 @pytest.fixture()
-def app(env_setup):  # noqa: ARG001
+def app(env_setup):
     from src.api.main_router import create_app
 
     return create_app()
@@ -155,11 +155,12 @@ class TestCreateReport:
 
         admin_app.dependency_overrides[get_db] = override_get_db
 
-        with patch("src.api.admin_reports.ResearchReport") as MockReport, patch(
-            "src.api.admin_reports.ReportCoin"
+        with (
+            patch("src.api.admin_reports.ResearchReport") as mock_report_cls,
+            patch("src.api.admin_reports.ReportCoin"),
         ):
             mock_instance = report
-            MockReport.return_value = mock_instance
+            mock_report_cls.return_value = mock_instance
             mock_instance.id = 1
 
             response = await admin_client.post(
@@ -243,10 +244,11 @@ class TestCreateReport:
 
         admin_app.dependency_overrides[get_db] = override_get_db
 
-        with patch("src.api.admin_reports.ResearchReport") as MockReport, patch(
-            "src.api.admin_reports.ReportCoin"
+        with (
+            patch("src.api.admin_reports.ResearchReport") as mock_report_cls,
+            patch("src.api.admin_reports.ReportCoin"),
         ):
-            MockReport.return_value = report
+            mock_report_cls.return_value = report
             report.id = 2
 
             response = await admin_client.post(
