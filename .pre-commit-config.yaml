@@ -1,8 +1,30 @@
 repos:
+  # Ruff — lint + format
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    # 版本须与 pyproject.toml 中 ruff>=0.8 开发依赖保持一致
-    rev: v0.8.0
+    rev: v0.15.5
     hooks:
       - id: ruff
+        name: ruff-check
         args: [--fix]
       - id: ruff-format
+
+  # 通用文件检查
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: [--maxkb=1000]
+      - id: detect-private-key
+
+  # 密钥扫描
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.5.0
+    hooks:
+      - id: detect-secrets
+        args: [--baseline, .secrets.baseline]
+        exclude: (uv\.lock|\.env\.example)$

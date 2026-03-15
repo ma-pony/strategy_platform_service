@@ -9,9 +9,7 @@ from pathlib import Path
 
 import pytest
 
-MIGRATIONS_DIR = (
-    Path(__file__).parent.parent.parent / "migrations" / "versions"
-)
+MIGRATIONS_DIR = Path(__file__).parent.parent.parent / "migrations" / "versions"
 
 EXPECTED_MIGRATIONS = {
     "001": "create_users",
@@ -41,7 +39,7 @@ class TestMigrationFilesExist:
         assert MIGRATIONS_DIR.exists()
         assert MIGRATIONS_DIR.is_dir()
 
-    @pytest.mark.parametrize("rev_id,slug", EXPECTED_MIGRATIONS.items())
+    @pytest.mark.parametrize(("rev_id", "slug"), EXPECTED_MIGRATIONS.items())
     def test_migration_file_exists(self, rev_id: str, slug: str) -> None:
         """每个迁移文件应存在。"""
         files = list(MIGRATIONS_DIR.glob(f"{rev_id}_*.py"))
@@ -111,9 +109,7 @@ class TestMigrationChain:
 def _load_email_auth_migration():
     """加载 replace_username_with_email_in_users 迁移模块。"""
     files = list(MIGRATIONS_DIR.glob(f"*{EMAIL_AUTH_MIGRATION_SLUG}.py"))
-    assert len(files) == 1, (
-        f"找不到包含 '{EMAIL_AUTH_MIGRATION_SLUG}' 的迁移文件"
-    )
+    assert len(files) == 1, f"找不到包含 '{EMAIL_AUTH_MIGRATION_SLUG}' 的迁移文件"
     module_name = f"migrations.versions.{files[0].stem}"
     return importlib.import_module(module_name)
 
@@ -124,9 +120,7 @@ class TestEmailAuthMigration:
     def test_email_auth_migration_file_exists(self) -> None:
         """replace_username_with_email_in_users 迁移文件应存在。"""
         files = list(MIGRATIONS_DIR.glob(f"*{EMAIL_AUTH_MIGRATION_SLUG}.py"))
-        assert len(files) == 1, (
-            f"缺少包含 '{EMAIL_AUTH_MIGRATION_SLUG}' 的迁移文件"
-        )
+        assert len(files) == 1, f"缺少包含 '{EMAIL_AUTH_MIGRATION_SLUG}' 的迁移文件"
 
     def test_email_auth_migration_has_upgrade(self) -> None:
         """迁移文件应有 upgrade() 函数。"""

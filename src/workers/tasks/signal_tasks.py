@@ -245,7 +245,8 @@ def compute_live_metrics(
     Returns:
         含 total_return、profit_factor、max_drawdown、sharpe_ratio、trade_count 的字典
     """
-    from sqlalchemy import select, text
+    from sqlalchemy import select
+
     from src.models.signal import TradingSignal
 
     stmt = (
@@ -277,15 +278,13 @@ def compute_live_metrics(
     confidences = [float(row.confidence_score or 0.0) for row in rows]
 
     # trade_count：非 hold 方向信号数（精确值）
-    non_hold = [(d, c) for d, c in zip(directions, confidences) if d != "hold"]
+    non_hold = [(d, c) for d, c in zip(directions, confidences, strict=False) if d != "hold"]
     trade_count: int = len(non_hold)
 
     # profit_factor：buy 置信度总和 / sell 置信度总和（近似盈亏比）
     buy_conf_sum = sum(c for d, c in non_hold if d == "buy")
     sell_conf_sum = sum(c for d, c in non_hold if d == "sell")
-    profit_factor: float | None = (
-        buy_conf_sum / sell_conf_sum if sell_conf_sum > 0 else None
-    )
+    profit_factor: float | None = buy_conf_sum / sell_conf_sum if sell_conf_sum > 0 else None
 
     # total_return：buy 方向信号置信度加权简化累计收益估算
     total_return: float | None = buy_conf_sum - sell_conf_sum
@@ -293,6 +292,7 @@ def compute_live_metrics(
     # sharpe_ratio：置信度序列均值 / 标准差近似
     if len(confidences) > 1:
         import statistics
+
         mean_conf = statistics.mean(confidences)
         stdev_conf = statistics.stdev(confidences)
         sharpe_ratio: float | None = (mean_conf / stdev_conf) if stdev_conf > 0 else None

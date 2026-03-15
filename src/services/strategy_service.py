@@ -25,9 +25,7 @@ class StrategyService:
     不暴露任何写入接口，策略数据仅通过 sqladmin 后台维护。
     """
 
-    async def list_strategies(
-        self, db: AsyncSession, page: int, page_size: int
-    ) -> tuple[list[Strategy], int]:
+    async def list_strategies(self, db: AsyncSession, page: int, page_size: int) -> tuple[list[Strategy], int]:
         """分页查询策略列表。
 
         使用 limit + offset 分页，避免全表扫描。
@@ -49,20 +47,13 @@ class StrategyService:
         total: int = count_result.scalar_one()
 
         # 查询分页数据
-        stmt = (
-            select(Strategy)
-            .order_by(Strategy.id)
-            .limit(page_size)
-            .offset(offset)
-        )
+        stmt = select(Strategy).order_by(Strategy.id).limit(page_size).offset(offset)
         result = await db.execute(stmt)
         strategies: list[Strategy] = list(result.scalars().all())
 
         return strategies, total
 
-    async def get_strategy(
-        self, db: AsyncSession, strategy_id: int
-    ) -> Strategy:
+    async def get_strategy(self, db: AsyncSession, strategy_id: int) -> Strategy:
         """查询策略详情。
 
         通过 selectinload 同时加载最近一次成功回测结果，避免 N+1 查询。

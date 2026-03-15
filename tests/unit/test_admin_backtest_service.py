@@ -5,7 +5,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from src.core.enums import TaskStatus
 from src.core.exceptions import NotFoundError, UnsupportedStrategyError
 
 
@@ -27,16 +26,16 @@ class TestAdminBacktestService:
         mock_db.commit = AsyncMock()
         mock_db.refresh = AsyncMock()
 
-        with patch("src.services.admin_backtest_service.lookup") as mock_lookup, \
-             patch("src.workers.celery_app.celery_app") as mock_celery:
+        with (
+            patch("src.services.admin_backtest_service.lookup") as mock_lookup,
+            patch("src.workers.celery_app.celery_app") as mock_celery,
+        ):
             mock_lookup.return_value = {
                 "class_name": "TurtleTradingStrategy",
                 "file_path": MagicMock(exists=MagicMock(return_value=True)),
             }
 
-            task = await service.submit_backtest(
-                mock_db, strategy_id=1, timerange="20240101-20240301"
-            )
+            await service.submit_backtest(mock_db, strategy_id=1, timerange="20240101-20240301")
 
             # 验证 Celery 入队被调用
             mock_celery.send_task.assert_called_once()
@@ -52,9 +51,7 @@ class TestAdminBacktestService:
         mock_db.get = AsyncMock(return_value=None)
 
         with pytest.raises(NotFoundError):
-            await service.submit_backtest(
-                mock_db, strategy_id=999, timerange="20240101-20240301"
-            )
+            await service.submit_backtest(mock_db, strategy_id=999, timerange="20240101-20240301")
 
     @pytest.mark.asyncio
     async def test_submit_backtest_unsupported_strategy(self) -> None:
@@ -72,9 +69,7 @@ class TestAdminBacktestService:
             side_effect=UnsupportedStrategyError("不支持"),
         ):
             with pytest.raises(UnsupportedStrategyError) as exc_info:
-                await service.submit_backtest(
-                    mock_db, strategy_id=1, timerange="20240101-20240301"
-                )
+                await service.submit_backtest(mock_db, strategy_id=1, timerange="20240101-20240301")
             assert exc_info.value.code == 3003
 
     @pytest.mark.asyncio

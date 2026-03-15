@@ -45,9 +45,7 @@ def app(env_setup):
 @pytest.fixture()
 async def client(app) -> AsyncGenerator[AsyncClient, None]:
     """提供绑定测试应用的异步 HTTP 客户端。"""
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as ac:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         yield ac
 
 
@@ -88,9 +86,7 @@ class TestBacktestListEndpoint:
     """GET /api/v1/strategies/{id}/backtests 接口测试。"""
 
     @pytest.mark.asyncio
-    async def test_anonymous_can_access_backtests_list(
-        self, client: AsyncClient, app
-    ) -> None:
+    async def test_anonymous_can_access_backtests_list(self, client: AsyncClient, app) -> None:
         """匿名用户可以访问回测列表（无需 Authorization header）。"""
         from src.core.deps import get_db
 
@@ -117,9 +113,7 @@ class TestBacktestListEndpoint:
         assert "items" in body["data"]
 
     @pytest.mark.asyncio
-    async def test_backtests_list_returns_paginated_response(
-        self, client: AsyncClient, app
-    ) -> None:
+    async def test_backtests_list_returns_paginated_response(self, client: AsyncClient, app) -> None:
         """回测列表接口返回正确分页结构。"""
         from src.core.deps import get_db
 
@@ -152,9 +146,7 @@ class TestBacktestListEndpoint:
         assert len(data["items"]) == 2
 
     @pytest.mark.asyncio
-    async def test_anonymous_sees_only_base_fields_in_backtest_list(
-        self, client: AsyncClient, app
-    ) -> None:
+    async def test_anonymous_sees_only_base_fields_in_backtest_list(self, client: AsyncClient, app) -> None:
         """匿名用户只能看到基础字段（total_return、sharpe_ratio 等为 null）。"""
         from src.core.deps import get_db
 
@@ -187,9 +179,7 @@ class TestBacktestListEndpoint:
         assert item.get("win_rate") is None
 
     @pytest.mark.asyncio
-    async def test_free_user_sees_free_tier_fields_not_vip_in_backtest_list(
-        self, client: AsyncClient, app
-    ) -> None:
+    async def test_free_user_sees_free_tier_fields_not_vip_in_backtest_list(self, client: AsyncClient, app) -> None:
         """Free 用户回测列表中可见 Free 字段，VIP 字段为 null。"""
         from src.core.deps import get_db, get_optional_user
         from src.core.enums import MembershipTier
@@ -230,9 +220,7 @@ class TestBacktestListEndpoint:
         assert item.get("win_rate") is None
 
     @pytest.mark.asyncio
-    async def test_vip_user_sees_all_fields_in_backtest_list(
-        self, client: AsyncClient, app
-    ) -> None:
+    async def test_vip_user_sees_all_fields_in_backtest_list(self, client: AsyncClient, app) -> None:
         """VIP 用户回测列表中可见所有字段。"""
         from src.core.deps import get_db, get_optional_user
         from src.core.enums import MembershipTier
@@ -274,9 +262,7 @@ class TestBacktestListFieldVisibility:
     """GET /api/v1/strategies/{id}/backtests 字段可见性及边界校验补充测试（审计批次 1）。"""
 
     @pytest.mark.asyncio
-    async def test_vip2_user_sees_all_fields_in_backtest_list(
-        self, client: AsyncClient, app
-    ) -> None:
+    async def test_vip2_user_sees_all_fields_in_backtest_list(self, client: AsyncClient, app) -> None:
         """VIP2 用户回测列表中所有字段均可见（包括 sharpe_ratio / win_rate）。"""
         from src.core.deps import get_db, get_optional_user
         from src.core.enums import MembershipTier
@@ -314,9 +300,7 @@ class TestBacktestListFieldVisibility:
         assert item["trade_count"] == 50
 
     @pytest.mark.asyncio
-    async def test_backtest_list_page_size_over_limit_returns_422_code_2001(
-        self, client: AsyncClient, app
-    ) -> None:
+    async def test_backtest_list_page_size_over_limit_returns_422_code_2001(self, client: AsyncClient, app) -> None:
         """page_size=200（超过上限）时返回 HTTP 422 + code:2001。"""
         from src.core.deps import get_db
 
@@ -336,9 +320,7 @@ class TestBacktestListFieldVisibility:
         assert body["code"] == 2001
 
     @pytest.mark.asyncio
-    async def test_backtest_list_page_zero_returns_422_code_2001(
-        self, client: AsyncClient, app
-    ) -> None:
+    async def test_backtest_list_page_zero_returns_422_code_2001(self, client: AsyncClient, app) -> None:
         """page=0 时返回 HTTP 422 + code:2001（页码最小值为 1）。"""
         from src.core.deps import get_db
 
@@ -358,9 +340,7 @@ class TestBacktestListFieldVisibility:
         assert body["code"] == 2001
 
     @pytest.mark.asyncio
-    async def test_backtest_list_bad_token_treated_as_anonymous(
-        self, client: AsyncClient, app
-    ) -> None:
+    async def test_backtest_list_bad_token_treated_as_anonymous(self, client: AsyncClient, app) -> None:
         """携带无效 token 时，软鉴权静默降级为匿名，回测列表返回 HTTP 200。"""
         from src.core.deps import get_db
 
@@ -392,9 +372,7 @@ class TestBacktestDetailEndpoint:
     """GET /api/v1/backtests/{id} 详情接口测试。"""
 
     @pytest.mark.asyncio
-    async def test_backtest_not_found_returns_404_with_code_3001(
-        self, client: AsyncClient, app
-    ) -> None:
+    async def test_backtest_not_found_returns_404_with_code_3001(self, client: AsyncClient, app) -> None:
         """回测记录不存在时返回 HTTP 404，code=3001。"""
         from src.core.deps import get_db
         from src.core.exceptions import NotFoundError
@@ -420,9 +398,7 @@ class TestBacktestDetailEndpoint:
         assert body["code"] == 3001
 
     @pytest.mark.asyncio
-    async def test_anonymous_gets_base_fields_in_backtest_detail(
-        self, client: AsyncClient, app
-    ) -> None:
+    async def test_anonymous_gets_base_fields_in_backtest_detail(self, client: AsyncClient, app) -> None:
         """匿名用户访问回测详情，仅返回基础字段。"""
         from src.core.deps import get_db
 
@@ -450,9 +426,7 @@ class TestBacktestDetailEndpoint:
         assert data.get("sharpe_ratio") is None
 
     @pytest.mark.asyncio
-    async def test_vip_user_gets_all_fields_in_backtest_detail(
-        self, client: AsyncClient, app
-    ) -> None:
+    async def test_vip_user_gets_all_fields_in_backtest_detail(self, client: AsyncClient, app) -> None:
         """VIP 用户访问回测详情，所有字段均可见。"""
         from src.core.deps import get_db, get_optional_user
         from src.core.enums import MembershipTier
@@ -493,9 +467,7 @@ class TestBacktestDetailFieldVisibility:
     """GET /api/v1/backtests/{id} 字段可见性及边界场景补充测试（审计批次 1）。"""
 
     @pytest.mark.asyncio
-    async def test_free_user_sees_base_but_not_vip_fields_in_detail(
-        self, client: AsyncClient, app
-    ) -> None:
+    async def test_free_user_sees_base_but_not_vip_fields_in_detail(self, client: AsyncClient, app) -> None:
         """Free 用户访问回测详情：total_return / trade_count / max_drawdown 可见，
         sharpe_ratio / win_rate 为 null。"""
         from src.core.deps import get_db, get_optional_user
@@ -535,9 +507,7 @@ class TestBacktestDetailFieldVisibility:
         assert data.get("win_rate") is None
 
     @pytest.mark.asyncio
-    async def test_vip2_user_sees_all_fields_in_backtest_detail(
-        self, client: AsyncClient, app
-    ) -> None:
+    async def test_vip2_user_sees_all_fields_in_backtest_detail(self, client: AsyncClient, app) -> None:
         """VIP2 用户访问回测详情：所有字段均可见（sharpe_ratio / win_rate 有值）。"""
         from src.core.deps import get_db, get_optional_user
         from src.core.enums import MembershipTier
@@ -575,9 +545,7 @@ class TestBacktestDetailFieldVisibility:
         assert data["trade_count"] == 50
 
     @pytest.mark.asyncio
-    async def test_non_integer_backtest_id_returns_422(
-        self, client: AsyncClient, app
-    ) -> None:
+    async def test_non_integer_backtest_id_returns_422(self, client: AsyncClient, app) -> None:
         """非整数回测 ID /backtests/abc 返回 HTTP 422，不应触发 500。"""
         from src.core.deps import get_db
 
@@ -595,9 +563,7 @@ class TestBacktestDetailFieldVisibility:
         assert response.status_code == 422
 
     @pytest.mark.asyncio
-    async def test_backtest_detail_bad_token_treated_as_anonymous(
-        self, client: AsyncClient, app
-    ) -> None:
+    async def test_backtest_detail_bad_token_treated_as_anonymous(self, client: AsyncClient, app) -> None:
         """携带无效 token 访问回测详情时，软鉴权静默降级为匿名，返回 HTTP 200。"""
         from src.core.deps import get_db
 

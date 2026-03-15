@@ -44,9 +44,7 @@ def app(env_setup):
 @pytest.fixture()
 async def client(app) -> AsyncGenerator[AsyncClient, None]:
     """提供绑定测试应用的异步 HTTP 客户端。"""
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as ac:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         yield ac
 
 
@@ -77,9 +75,7 @@ class TestSignalListEndpoint:
     """GET /api/v1/strategies/{id}/signals 接口测试。"""
 
     @pytest.mark.asyncio
-    async def test_signal_endpoint_returns_signals_and_last_updated_at(
-        self, client: AsyncClient, app
-    ) -> None:
+    async def test_signal_endpoint_returns_signals_and_last_updated_at(self, client: AsyncClient, app) -> None:
         """信号接口返回 signals 列表和 last_updated_at 字段。"""
         from src.core.deps import get_db
 
@@ -110,9 +106,7 @@ class TestSignalListEndpoint:
         assert "last_updated_at" in data
 
     @pytest.mark.asyncio
-    async def test_anonymous_cannot_see_confidence_score(
-        self, client: AsyncClient, app
-    ) -> None:
+    async def test_anonymous_cannot_see_confidence_score(self, client: AsyncClient, app) -> None:
         """匿名用户信号响应中 confidence_score 应为 null。"""
         from src.core.deps import get_db
 
@@ -139,9 +133,7 @@ class TestSignalListEndpoint:
         assert item.get("confidence_score") is None
 
     @pytest.mark.asyncio
-    async def test_free_user_cannot_see_confidence_score(
-        self, client: AsyncClient, app
-    ) -> None:
+    async def test_free_user_cannot_see_confidence_score(self, client: AsyncClient, app) -> None:
         """Free 用户信号响应中 confidence_score 应为 null。"""
         from src.core.deps import get_db, get_optional_user
         from src.core.enums import MembershipTier
@@ -177,9 +169,7 @@ class TestSignalListEndpoint:
         assert item.get("confidence_score") is None
 
     @pytest.mark.asyncio
-    async def test_vip_user_can_see_confidence_score(
-        self, client: AsyncClient, app
-    ) -> None:
+    async def test_vip_user_can_see_confidence_score(self, client: AsyncClient, app) -> None:
         """VIP 用户信号响应中应包含 confidence_score。"""
         from src.core.deps import get_db, get_optional_user
         from src.core.enums import MembershipTier
@@ -215,9 +205,7 @@ class TestSignalListEndpoint:
         assert item["confidence_score"] == pytest.approx(0.85)
 
     @pytest.mark.asyncio
-    async def test_strategy_not_found_returns_404_with_code_3001(
-        self, client: AsyncClient, app
-    ) -> None:
+    async def test_strategy_not_found_returns_404_with_code_3001(self, client: AsyncClient, app) -> None:
         """strategy_id 不存在时返回 HTTP 404，code=3001。"""
         from src.core.deps import get_db
         from src.core.exceptions import NotFoundError
@@ -243,9 +231,7 @@ class TestSignalListEndpoint:
         assert body["code"] == 3001
 
     @pytest.mark.asyncio
-    async def test_signals_limit_query_param_works(
-        self, client: AsyncClient, app
-    ) -> None:
+    async def test_signals_limit_query_param_works(self, client: AsyncClient, app) -> None:
         """?limit 查询参数应被接受。"""
         from src.core.deps import get_db
 
@@ -269,9 +255,7 @@ class TestSignalListEndpoint:
         assert response.status_code == 200
 
     @pytest.mark.asyncio
-    async def test_signals_response_contains_direction_and_signal_at(
-        self, client: AsyncClient, app
-    ) -> None:
+    async def test_signals_response_contains_direction_and_signal_at(self, client: AsyncClient, app) -> None:
         """信号响应中包含 direction 和 signal_at 字段（所有用户可见）。"""
         from src.core.deps import get_db
 
@@ -303,9 +287,7 @@ class TestSignalVip2FieldVisibility:
     """GET /api/v1/strategies/{id}/signals VIP2 字段可见性补充测试（审计批次 1）。"""
 
     @pytest.mark.asyncio
-    async def test_vip2_user_sees_confidence_score(
-        self, client: AsyncClient, app
-    ) -> None:
+    async def test_vip2_user_sees_confidence_score(self, client: AsyncClient, app) -> None:
         """VIP2 用户信号响应中应包含 confidence_score（与 VIP1 相同权限）。"""
         from src.core.deps import get_db, get_optional_user
         from src.core.enums import MembershipTier
@@ -345,9 +327,7 @@ class TestSignalLimitValidation:
     """GET /api/v1/strategies/{id}/signals limit 参数边界校验补充测试（审计批次 1）。"""
 
     @pytest.mark.asyncio
-    async def test_limit_zero_returns_422_code_2001(
-        self, client: AsyncClient, app
-    ) -> None:
+    async def test_limit_zero_returns_422_code_2001(self, client: AsyncClient, app) -> None:
         """limit=0 时返回 HTTP 422 + code:2001（最小值校验）。"""
         from src.core.deps import get_db
 
@@ -367,9 +347,7 @@ class TestSignalLimitValidation:
         assert body["code"] == 2001
 
     @pytest.mark.asyncio
-    async def test_limit_exceeds_max_returns_422_code_2001(
-        self, client: AsyncClient, app
-    ) -> None:
+    async def test_limit_exceeds_max_returns_422_code_2001(self, client: AsyncClient, app) -> None:
         """limit=200（超过上限）时返回 HTTP 422 + code:2001。"""
         from src.core.deps import get_db
 
@@ -393,9 +371,7 @@ class TestSignalSoftAuth:
     """GET /api/v1/strategies/{id}/signals 软鉴权场景补充测试（审计批次 1）。"""
 
     @pytest.mark.asyncio
-    async def test_bad_token_treated_as_anonymous_returns_200(
-        self, client: AsyncClient, app
-    ) -> None:
+    async def test_bad_token_treated_as_anonymous_returns_200(self, client: AsyncClient, app) -> None:
         """携带无效 token 时，软鉴权静默降级为匿名，信号接口返回 HTTP 200。"""
         from src.core.deps import get_db
 
@@ -435,9 +411,7 @@ class TestSignalEmptyCacheProtection:
     """任务 7.1：空缓存场景 → 返回空列表 + code:0，而非 HTTP 500（需求 4.4）。"""
 
     @pytest.mark.asyncio
-    async def test_empty_cache_returns_empty_list_with_code_0(
-        self, client: AsyncClient, app
-    ) -> None:
+    async def test_empty_cache_returns_empty_list_with_code_0(self, client: AsyncClient, app) -> None:
         """信号缓存为空时 → HTTP 200 + code:0 + 空 signals 列表，而非 HTTP 500。
 
         需求 4.4：若信号缓存中不存在指定策略和交易对的数据，系统返回空列表而非 500 错误。
@@ -481,4 +455,3 @@ class TestSignalPerformancePlaceholder:
         延后原因：需要 pytest-benchmark 或 Locust/k6 等性能测试工具，
         当前 CI 环境未配置，待专项性能测试方案确定后实现。
         """
-        pass

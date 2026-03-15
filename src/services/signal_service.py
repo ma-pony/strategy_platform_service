@@ -13,7 +13,6 @@ Redis 键设计：
 """
 
 import json
-import logging
 from datetime import datetime, timezone
 from typing import Any
 
@@ -79,9 +78,7 @@ class SignalService:
             if cached is not None:
                 data: dict[str, Any] = json.loads(cached)
                 signals_raw = data.get("signals", [])
-                last_updated_at_str: str = data.get(
-                    "last_updated_at", datetime.now(timezone.utc).isoformat()
-                )
+                last_updated_at_str: str = data.get("last_updated_at", datetime.now(timezone.utc).isoformat())
                 last_updated_at = datetime.fromisoformat(last_updated_at_str)
 
                 # 将 dict 转换为 TradingSignal-like 对象

@@ -10,11 +10,9 @@
   - indicator_values 排除 OHLCV 和信号列
 """
 
-import math
 
 import numpy as np
 import pandas as pd
-import pytest
 
 from src.freqtrade_bridge.seeds.seed_signals import _extract_all_signals
 
@@ -31,14 +29,16 @@ def _make_strategy_df(
     """
     rng = np.random.default_rng(42)
     closes = 30000.0 + rng.uniform(-200, 200, n).cumsum()
-    df = pd.DataFrame({
-        "date": pd.date_range("2025-01-01", periods=n, freq="4h", tz="UTC"),
-        "open": closes * 0.999,
-        "high": closes * 1.005,
-        "low": closes * 0.995,
-        "close": closes,
-        "volume": rng.uniform(500, 2000, n),
-    })
+    df = pd.DataFrame(
+        {
+            "date": pd.date_range("2025-01-01", periods=n, freq="4h", tz="UTC"),
+            "open": closes * 0.999,
+            "high": closes * 1.005,
+            "low": closes * 0.995,
+            "close": closes,
+            "volume": rng.uniform(500, 2000, n),
+        }
+    )
     df["atr"] = 100.0
     df["volume_mean"] = df["volume"].rolling(20).mean()
     df["rsi"] = 50.0
@@ -62,20 +62,24 @@ class TestEdgeTriggeredExtraction:
 
     def test_consecutive_same_direction_produces_single_signal(self) -> None:
         """连续两根 enter_long=1 只生成一条 buy 信号。"""
-        df = _make_strategy_df(signals=[
-            {"index": 25, "enter_long": 1},
-            {"index": 26, "enter_long": 1},
-        ])
+        df = _make_strategy_df(
+            signals=[
+                {"index": 25, "enter_long": 1},
+                {"index": 26, "enter_long": 1},
+            ]
+        )
         signals = _extract_all_signals(df, "BTC/USDT", 1)
         buy_signals = [s for s in signals if s["signal_at"] >= df.loc[25, "date"]]
         assert len(buy_signals) == 1
 
     def test_direction_change_produces_new_signal(self) -> None:
         """buy → sell 方向变化产生两条信号。"""
-        df = _make_strategy_df(signals=[
-            {"index": 25, "enter_long": 1},
-            {"index": 27, "enter_short": 1},
-        ])
+        df = _make_strategy_df(
+            signals=[
+                {"index": 25, "enter_long": 1},
+                {"index": 27, "enter_short": 1},
+            ]
+        )
         signals = _extract_all_signals(df, "BTC/USDT", 1)
         late_signals = [s for s in signals if s["signal_at"] >= df.loc[25, "date"]]
         assert len(late_signals) == 2
@@ -84,14 +88,15 @@ class TestEdgeTriggeredExtraction:
 
     def test_gap_resets_edge_trigger(self) -> None:
         """中间有无信号 K 线后，同方向信号视为新信号。"""
-        df = _make_strategy_df(signals=[
-            {"index": 22, "enter_long": 1},
-            # index 23-24 无信号 → prev_direction 重置
-            {"index": 25, "enter_long": 1},
-        ])
+        df = _make_strategy_df(
+            signals=[
+                {"index": 22, "enter_long": 1},
+                # index 23-24 无信号 → prev_direction 重置
+                {"index": 25, "enter_long": 1},
+            ]
+        )
         signals = _extract_all_signals(df, "BTC/USDT", 1)
-        buy_signals = [s for s in signals if s["direction"] == "buy"
-                       and s["signal_at"] >= df.loc[22, "date"]]
+        buy_signals = [s for s in signals if s["direction"] == "buy" and s["signal_at"] >= df.loc[22, "date"]]
         assert len(buy_signals) == 2
 
 
@@ -100,9 +105,11 @@ class TestDirectionPriority:
 
     def test_enter_short_priority_over_exit_long(self) -> None:
         """enter_short 和 exit_long 同时为 1 时，enter_short 优先。"""
-        df = _make_strategy_df(signals=[
-            {"index": 25, "enter_short": 1, "exit_long": 1},
-        ])
+        df = _make_strategy_df(
+            signals=[
+                {"index": 25, "enter_short": 1, "exit_long": 1},
+            ]
+        )
         signals = _extract_all_signals(df, "BTC/USDT", 1)
         sig = [s for s in signals if s["signal_at"] == df.loc[25, "date"]]
         assert len(sig) == 1
@@ -150,11 +157,13 @@ class TestConfidenceScoreSeed:
 
     def test_confidence_within_valid_range(self) -> None:
         """confidence 在 [0.50, 0.95] 范围内。"""
-        df = _make_strategy_df(signals=[
-            {"index": 22, "enter_long": 1},
-            {"index": 25, "enter_short": 1},
-            {"index": 28, "exit_long": 1},
-        ])
+        df = _make_strategy_df(
+            signals=[
+                {"index": 22, "enter_long": 1},
+                {"index": 25, "enter_short": 1},
+                {"index": 28, "exit_long": 1},
+            ]
+        )
         signals = _extract_all_signals(df, "BTC/USDT", 1)
         for s in signals:
             assert 0.50 <= s["confidence_score"] <= 0.95
@@ -210,6 +219,16 @@ class TestIndicatorValues:
         df = _make_strategy_df(signals=[{"index": 25, "enter_long": 1}])
         signals = _extract_all_signals(df, "BTC/USDT", 1)
         sig = [s for s in signals if s["signal_at"] == df.loc[25, "date"]][0]
-        forbidden = {"date", "open", "high", "low", "close", "volume",
-                     "enter_long", "exit_long", "enter_short", "exit_short"}
+        forbidden = {
+            "date",
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume",
+            "enter_long",
+            "exit_long",
+            "enter_short",
+            "exit_short",
+        }
         assert forbidden.isdisjoint(sig["indicator_values"].keys())

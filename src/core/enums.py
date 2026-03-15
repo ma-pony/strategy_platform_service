@@ -4,10 +4,10 @@
 供业务逻辑层和数据模型层共用。
 """
 
-from enum import Enum
+from enum import StrEnum
 
 
-class MembershipTier(str, Enum):
+class MembershipTier(StrEnum):
     """会员等级枚举。
 
     层次顺序（低 → 高）：FREE < VIP1 < VIP2。
@@ -18,7 +18,7 @@ class MembershipTier(str, Enum):
     VIP2 = "vip2"
 
 
-class TaskStatus(str, Enum):
+class TaskStatus(StrEnum):
     """回测任务状态枚举。
 
     状态只能单向流转：PENDING → RUNNING → DONE | FAILED。
@@ -30,7 +30,7 @@ class TaskStatus(str, Enum):
     FAILED = "failed"
 
 
-class SignalDirection(str, Enum):
+class SignalDirection(StrEnum):
     """交易信号方向枚举。"""
 
     BUY = "buy"
@@ -38,7 +38,7 @@ class SignalDirection(str, Enum):
     HOLD = "hold"
 
 
-class DataSource(str, Enum):
+class DataSource(StrEnum):
     """绩效指标数据来源枚举。
 
     标识策略对绩效指标的最后一次更新来源：

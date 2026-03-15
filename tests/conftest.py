@@ -11,7 +11,6 @@ env_setup / app / client / mock_db 定义模式。
 
 import os
 from collections.abc import AsyncGenerator, Callable, Generator
-from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -89,9 +88,7 @@ async def async_client(app: FastAPI) -> AsyncGenerator[AsyncClient, None]:
 
     使用 async with 上下文管理确保连接正确关闭（需求 8.2）。
     """
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as ac:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         yield ac
 
 

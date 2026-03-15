@@ -75,10 +75,7 @@ def seed_strategies(session: Session) -> int:
     Returns:
         新增策略数量
     """
-    existing = {
-        row[0]
-        for row in session.execute(sa.select(Strategy.name)).fetchall()
-    }
+    existing = {row[0] for row in session.execute(sa.select(Strategy.name)).fetchall()}
 
     inserted = 0
     for data in SEED_STRATEGIES:

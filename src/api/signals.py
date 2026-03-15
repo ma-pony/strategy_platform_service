@@ -10,7 +10,6 @@
 使用 get_optional_user 注入可选用户（无 token 时返回 None 即匿名）。
 """
 
-from datetime import datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, Query
@@ -50,9 +49,7 @@ async def get_signals(
 
     策略不存在时返回 code:3001 HTTP 404。
     """
-    signals, last_updated_at = await _signal_service.get_signals(
-        db, strategy_id=strategy_id, limit=limit
-    )
+    signals, last_updated_at = await _signal_service.get_signals(db, strategy_id=strategy_id, limit=limit)
 
     # 确定当前用户会员等级
     membership = current_user.membership if current_user is not None else None

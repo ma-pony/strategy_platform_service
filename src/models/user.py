@@ -22,9 +22,7 @@ class User(Base, TimestampMixin):
     __table_args__ = (Index("idx_users_email", "email"),)
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    email: Mapped[str] = mapped_column(
-        String(254), unique=True, nullable=False, index=True
-    )
+    email: Mapped[str] = mapped_column(String(254), unique=True, nullable=False, index=True)
     hashed_password: Mapped[str] = mapped_column(String(256), nullable=False)
     membership: Mapped[MembershipTier] = mapped_column(
         Enum(MembershipTier, name="membershiptier", values_callable=lambda x: [e.value for e in x]),
@@ -32,9 +30,5 @@ class User(Base, TimestampMixin):
         default=MembershipTier.FREE,
         server_default=MembershipTier.FREE.value,
     )
-    is_active: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, default=True, server_default="true"
-    )
-    is_admin: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, default=False, server_default="false"
-    )
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
+    is_admin: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")

@@ -21,7 +21,6 @@ from __future__ import annotations
 
 import os
 from collections.abc import AsyncGenerator, Generator
-from typing import Any
 
 import pytest
 from sqlalchemy import text
@@ -48,6 +47,7 @@ _DEFAULT_TEST_DB_URL = "postgresql+asyncpg://postgres:123456@localhost:5432/stra
 
 
 # ─── 辅助函数（供 TDD 测试直接调用）─────────────────────────────────────────────
+
 
 def _check_test_database_url() -> str:
     """检查 TEST_DATABASE_URL 环境变量是否已设置。
@@ -93,6 +93,7 @@ def _derive_sync_url(async_url: str) -> str:
 def _sync_ping(sync_url: str) -> bool:
     """使用 psycopg2 同步连接验证数据库可达性（不创建 asyncpg 连接）。"""
     from sqlalchemy import create_engine
+
     engine = create_engine(sync_url, pool_pre_ping=True)
     try:
         with engine.connect() as conn:
@@ -105,6 +106,7 @@ def _sync_ping(sync_url: str) -> bool:
 
 
 # ─── Session 作用域：Alembic 迁移 ────────────────────────────────────────────────
+
 
 @pytest.fixture(scope="session")
 def alembic_setup() -> Generator[None, None, None]:
@@ -127,10 +129,7 @@ def alembic_setup() -> Generator[None, None, None]:
 
     # 同步验证连通性（psycopg2，不涉及 asyncpg event loop）
     if not _sync_ping(sync_url):
-        pytest.skip(
-            "TEST_DATABASE_URL 设置了，但无法连接到数据库。"
-            "请确认 PostgreSQL 实例已启动且连接参数正确。"
-        )
+        pytest.skip("TEST_DATABASE_URL 设置了，但无法连接到数据库。请确认 PostgreSQL 实例已启动且连接参数正确。")
 
     project_root = Path(__file__).parent.parent.parent
     alembic_ini = project_root / "alembic.ini"
@@ -141,10 +140,7 @@ def alembic_setup() -> Generator[None, None, None]:
     try:
         command.upgrade(alembic_cfg, "head")
     except Exception as exc:
-        pytest.skip(
-            f"alembic upgrade head 失败（{exc}）。"
-            "请确认迁移文件存在，或先运行 make migrate 创建初始迁移。"
-        )
+        pytest.skip(f"alembic upgrade head 失败（{exc}）。请确认迁移文件存在，或先运行 make migrate 创建初始迁移。")
 
     yield
 
@@ -152,6 +148,7 @@ def alembic_setup() -> Generator[None, None, None]:
         command.downgrade(alembic_cfg, "base")
     except Exception:
         import warnings
+
         warnings.warn(
             "alembic downgrade base 失败，测试数据库可能未被完整清理。",
             stacklevel=2,
@@ -159,6 +156,7 @@ def alembic_setup() -> Generator[None, None, None]:
 
 
 # ─── Session 作用域：真实 DB 引擎 ────────────────────────────────────────────────
+
 
 @pytest.fixture(scope="session")
 def real_db_engine(alembic_setup: None) -> Generator[AsyncEngine, None, None]:
@@ -178,13 +176,14 @@ def real_db_engine(alembic_setup: None) -> Generator[AsyncEngine, None, None]:
         poolclass=NullPool,
     )
 
-    yield engine
+    return engine
 
     # teardown：无法 await dispose()，因为 session-scoped sync fixture 无 event loop
     # asyncpg 连接池在进程退出时自动清理
 
 
 # ─── Function 作用域：真实 DB 会话 ───────────────────────────────────────────────
+
 
 @pytest.fixture()
 async def real_db_session(
@@ -214,6 +213,4 @@ async def real_db_session(
     async with session_factory() as cleanup_session:
         async with cleanup_session.begin():
             for table in _TABLES_TO_TRUNCATE:
-                await cleanup_session.execute(
-                    text(f"TRUNCATE TABLE {table} RESTART IDENTITY CASCADE")
-                )
+                await cleanup_session.execute(text(f"TRUNCATE TABLE {table} RESTART IDENTITY CASCADE"))

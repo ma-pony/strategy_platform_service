@@ -8,8 +8,7 @@
 需求可追溯：2.1, 2.2, 2.5
 """
 
-from datetime import datetime, timezone
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -23,6 +22,7 @@ def env_setup(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("REDIS_URL", "redis://localhost:6379/0")
 
     from src.core import app_settings
+
     app_settings.get_settings.cache_clear()
     yield
     app_settings.get_settings.cache_clear()
@@ -38,9 +38,7 @@ class TestBacktestMetricsChain:
 
         mock_session = MagicMock()
 
-        with patch(
-            "src.workers.tasks.backtest_tasks.upsert_pair_metrics"
-        ) as mock_upsert:
+        with patch("src.workers.tasks.backtest_tasks.upsert_pair_metrics") as mock_upsert:
             _upsert_metrics_for_backtest(
                 session=mock_session,
                 strategy_id=1,

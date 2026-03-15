@@ -11,7 +11,7 @@
 """
 
 from datetime import datetime, timezone
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -89,9 +89,7 @@ class TestUpsertPairMetricsBasic:
 class TestUpsertPairMetricsValidation:
     """校验失败时的行为测试（需求 6.2, 6.3）。"""
 
-    def test_invalid_total_return_skips_upsert_and_logs_warning(
-        self, caplog: pytest.LogCaptureFixture
-    ) -> None:
+    def test_invalid_total_return_skips_upsert_and_logs_warning(self, caplog: pytest.LogCaptureFixture) -> None:
         """total_return 超出范围时应跳过 upsert，不调用 session.execute()。"""
         mock_session = MagicMock()
         now = datetime.now(timezone.utc)
@@ -226,15 +224,13 @@ class TestUpsertPairMetricsRetry:
 
         mock_session = MagicMock()
         # 模拟 DB 连接错误（每次调用都失败）
-        mock_session.execute.side_effect = OperationalError(
-            "connection refused", {}, Exception("conn refused")
-        )
+        mock_session.execute.side_effect = OperationalError("connection refused", {}, Exception("conn refused"))
         now = datetime.now(timezone.utc)
 
         # 使用 patch 避免实际 sleep
         with (
             patch("src.services.pair_metrics_service.time.sleep"),
-            patch("src.services.pair_metrics_service.logger") as mock_logger,
+            patch("src.services.pair_metrics_service.logger"),
             pytest.raises((OperationalError, Exception)),
         ):
             upsert_pair_metrics(
@@ -259,9 +255,7 @@ class TestUpsertPairMetricsRetry:
         from sqlalchemy.exc import OperationalError
 
         mock_session = MagicMock()
-        mock_session.execute.side_effect = OperationalError(
-            "connection refused", {}, Exception("conn refused")
-        )
+        mock_session.execute.side_effect = OperationalError("connection refused", {}, Exception("conn refused"))
         now = datetime.now(timezone.utc)
 
         with (
@@ -291,9 +285,7 @@ class TestUpsertPairMetricsRetry:
         from sqlalchemy.exc import OperationalError
 
         mock_session = MagicMock()
-        mock_session.execute.side_effect = OperationalError(
-            "connection refused", {}, Exception("conn refused")
-        )
+        mock_session.execute.side_effect = OperationalError("connection refused", {}, Exception("conn refused"))
         now = datetime.now(timezone.utc)
 
         with (
@@ -323,9 +315,7 @@ class TestUpsertPairMetricsRetry:
         from sqlalchemy.exc import OperationalError
 
         mock_session = MagicMock()
-        mock_session.execute.side_effect = OperationalError(
-            "connection refused", {}, Exception("conn refused")
-        )
+        mock_session.execute.side_effect = OperationalError("connection refused", {}, Exception("conn refused"))
         now = datetime.now(timezone.utc)
 
         sleep_calls: list[float] = []

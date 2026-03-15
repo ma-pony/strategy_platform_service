@@ -6,7 +6,7 @@
   - 不提供任何触发回测的方法
 """
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -59,9 +59,7 @@ class TestBacktestServiceListBacktests:
 
         mock_db.execute = AsyncMock(side_effect=[count_result, data_result])
 
-        backtest_results, total = await service.list_backtests(
-            mock_db, strategy_id=1, page=1, page_size=20
-        )
+        backtest_results, total = await service.list_backtests(mock_db, strategy_id=1, page=1, page_size=20)
 
         assert total == 2
         assert len(backtest_results) == 2
@@ -82,9 +80,7 @@ class TestBacktestServiceListBacktests:
 
         mock_db.execute = AsyncMock(side_effect=[count_result, data_result])
 
-        results, total = await service.list_backtests(
-            mock_db, strategy_id=99, page=1, page_size=10
-        )
+        results, total = await service.list_backtests(mock_db, strategy_id=99, page=1, page_size=10)
 
         assert total == 0
         assert results == []
@@ -106,9 +102,7 @@ class TestBacktestServiceListBacktests:
 
         mock_db.execute = AsyncMock(side_effect=[count_result, data_result])
 
-        results, total = await service.list_backtests(
-            mock_db, strategy_id=1, page=3, page_size=5
-        )
+        results, total = await service.list_backtests(mock_db, strategy_id=1, page=3, page_size=5)
 
         assert total == 100
         assert len(results) == 1
@@ -129,9 +123,7 @@ class TestBacktestServiceListBacktests:
 
         mock_db.execute = AsyncMock(side_effect=[count_result, data_result])
 
-        results, total = await service.list_backtests(
-            mock_db, strategy_id=1, page=1, page_size=20
-        )
+        results, total = await service.list_backtests(mock_db, strategy_id=1, page=1, page_size=20)
 
         assert results == []
         assert total == 0

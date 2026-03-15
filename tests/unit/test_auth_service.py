@@ -11,10 +11,9 @@
 需求覆盖：1.3, 1.4, 2.1, 2.2, 2.3, 2.4, 2.5, 2.6（任务 7.3）。
 """
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-
 
 # 测试用固定密钥
 TEST_SECRET = "test-secret-key-for-unit-tests-only-256bits"
@@ -54,9 +53,7 @@ def auth_service(env_setup):
 class TestRegister:
     """AuthService.register 注册逻辑测试。"""
 
-    async def test_register_success_returns_user_with_free_membership(
-        self, auth_service, security
-    ) -> None:
+    async def test_register_success_returns_user_with_free_membership(self, auth_service, security) -> None:
         """成功注册时，返回 membership=FREE 的用户对象。"""
         from src.core.enums import MembershipTier
         from src.models.user import User
@@ -92,9 +89,7 @@ class TestRegister:
         db.add.assert_called_once()
         db.commit.assert_awaited_once()
 
-    async def test_register_duplicate_email_raises_email_conflict_error(
-        self, auth_service
-    ) -> None:
+    async def test_register_duplicate_email_raises_email_conflict_error(self, auth_service) -> None:
         """邮箱已存在时抛出 EmailConflictError(code=3010)。"""
         from src.core.exceptions import EmailConflictError
         from src.models.user import User
@@ -145,9 +140,7 @@ class TestRegister:
 class TestLogin:
     """AuthService.login 登录逻辑测试。"""
 
-    async def test_login_success_returns_token_pair(
-        self, auth_service, security
-    ) -> None:
+    async def test_login_success_returns_token_pair(self, auth_service, security) -> None:
         """凭证正确时返回 (access_token, refresh_token) 元组。"""
         from src.core.enums import MembershipTier
         from src.models.user import User
@@ -165,9 +158,7 @@ class TestLogin:
         mock_result.scalar_one_or_none.return_value = mock_user
         db.execute.return_value = mock_result
 
-        access_token, refresh_token = await auth_service.login(
-            db, "test@example.com", "correctpassword"
-        )
+        access_token, refresh_token = await auth_service.login(db, "test@example.com", "correctpassword")
 
         assert access_token
         assert refresh_token
@@ -176,9 +167,7 @@ class TestLogin:
         assert payload["sub"] == "42"
         assert payload["type"] == "access"
 
-    async def test_login_wrong_password_raises_login_not_found_error(
-        self, auth_service, security
-    ) -> None:
+    async def test_login_wrong_password_raises_login_not_found_error(self, auth_service, security) -> None:
         """密码错误时抛出 LoginNotFoundError(code=1004)，防止用户枚举。"""
         from src.core.enums import MembershipTier
         from src.core.exceptions import LoginNotFoundError
@@ -201,9 +190,7 @@ class TestLogin:
 
         assert exc_info.value.code == 1004
 
-    async def test_login_user_not_found_raises_login_not_found_error(
-        self, auth_service
-    ) -> None:
+    async def test_login_user_not_found_raises_login_not_found_error(self, auth_service) -> None:
         """邮箱不存在时抛出 LoginNotFoundError(code=1004)，与密码错误同一错误码。"""
         from src.core.exceptions import LoginNotFoundError
 
@@ -217,9 +204,7 @@ class TestLogin:
 
         assert exc_info.value.code == 1004
 
-    async def test_login_inactive_user_raises_account_disabled_error(
-        self, auth_service, security
-    ) -> None:
+    async def test_login_inactive_user_raises_account_disabled_error(self, auth_service, security) -> None:
         """禁用账号登录时抛出 AccountDisabledError(code=1005)。"""
         from src.core.enums import MembershipTier
         from src.core.exceptions import AccountDisabledError
@@ -246,9 +231,7 @@ class TestLogin:
 class TestRefreshAccessToken:
     """AuthService.refresh_access_token token 刷新逻辑测试。"""
 
-    async def test_refresh_with_valid_refresh_token_returns_new_access_token(
-        self, auth_service, security
-    ) -> None:
+    async def test_refresh_with_valid_refresh_token_returns_new_access_token(self, auth_service, security) -> None:
         """有效 refresh_token 时返回新的 access_token。"""
         from src.core.enums import MembershipTier
         from src.models.user import User
@@ -269,25 +252,19 @@ class TestRefreshAccessToken:
         assert payload["sub"] == "99"
         assert payload["type"] == "access"
 
-    async def test_refresh_with_access_token_raises_authentication_error(
-        self, auth_service, security
-    ) -> None:
+    async def test_refresh_with_access_token_raises_authentication_error(self, auth_service, security) -> None:
         """传入 access_token（type 不匹配）时抛出 AuthenticationError。"""
         from src.core.enums import MembershipTier
         from src.core.exceptions import AuthenticationError
 
         # 传入 access_token 而非 refresh_token
-        access_token = security.create_access_token(
-            sub="1", membership=MembershipTier.FREE
-        )
+        access_token = security.create_access_token(sub="1", membership=MembershipTier.FREE)
         db = AsyncMock()
 
         with pytest.raises(AuthenticationError):
             await auth_service.refresh_access_token(db, access_token)
 
-    async def test_refresh_with_expired_token_raises_authentication_error(
-        self, auth_service
-    ) -> None:
+    async def test_refresh_with_expired_token_raises_authentication_error(self, auth_service) -> None:
         """refresh_token 过期时抛出 AuthenticationError。"""
         from datetime import datetime, timedelta, timezone
 
@@ -307,9 +284,7 @@ class TestRefreshAccessToken:
         with pytest.raises(AuthenticationError):
             await auth_service.refresh_access_token(db, expired_token)
 
-    async def test_refresh_with_invalid_token_raises_authentication_error(
-        self, auth_service
-    ) -> None:
+    async def test_refresh_with_invalid_token_raises_authentication_error(self, auth_service) -> None:
         """无效 token 字符串时抛出 AuthenticationError。"""
         from src.core.exceptions import AuthenticationError
 

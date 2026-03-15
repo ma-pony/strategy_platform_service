@@ -154,7 +154,7 @@ def _compute_strategy_aggregate(
     # 胜率：从所有交易对的信号对中统计
     total_wins = 0
     total_completed = 0
-    for pair, sigs in all_pair_signals.items():
+    for sigs in all_pair_signals.values():
         sorted_sigs = sorted(sigs, key=lambda s: s["signal_at"])
         pending_buy = None
         for sig in sorted_sigs:
@@ -217,8 +217,7 @@ def seed_all(session: Session) -> dict[str, int]:
 
     # 获取策略映射
     strategy_map: dict[str, int] = {
-        row.name: row.id
-        for row in session.execute(sa.select(Strategy.name, Strategy.id)).fetchall()
+        row.name: row.id for row in session.execute(sa.select(Strategy.name, Strategy.id)).fetchall()
     }
 
     # ---- 2. 运行策略并提取信号 ----
@@ -310,9 +309,7 @@ def seed_all(session: Session) -> dict[str, int]:
 
     for class_name, pair_signals in all_strategy_signals.items():
         strategy_id = strategy_map[class_name]
-        agg = _compute_strategy_aggregate(
-            all_pair_metrics[class_name], pair_signals
-        )
+        agg = _compute_strategy_aggregate(all_pair_metrics[class_name], pair_signals)
 
         # 创建 BacktestTask
         task = BacktestTask(
@@ -329,8 +326,7 @@ def seed_all(session: Session) -> dict[str, int]:
         # 确定时间范围（从信号中取最早和最晚时间）
         all_signal_times = []
         for sigs in pair_signals.values():
-            for s in sigs:
-                all_signal_times.append(s["signal_at"])
+            all_signal_times.extend(s["signal_at"] for s in sigs)
 
         if all_signal_times:
             period_start = min(all_signal_times)
@@ -427,7 +423,7 @@ def _clear_all(session: Session) -> dict[str, int]:
     ]
     deleted = {}
     for table in tables:
-        count = session.execute(sa.text(f"DELETE FROM {table}")).rowcount  # noqa: S608
+        count = session.execute(sa.text(f"DELETE FROM {table}")).rowcount
         deleted[table] = count
         print(f"  🗑 {table}: 删除 {count} 条")
     session.commit()
@@ -452,4 +448,4 @@ if __name__ == "__main__":
         print("=" * 60)
         for table, count in counts.items():
             print(f"  {table}: {count}")
-        print(f"\n✅ 全量种子数据初始化完成！")
+        print("\n✅ 全量种子数据初始化完成！")

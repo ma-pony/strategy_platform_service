@@ -17,7 +17,7 @@ from typing import Any
 from pydantic import BaseModel, Field, SerializationInfo, model_serializer
 
 from src.core.enums import DataSource, MembershipTier
-from src.schemas.strategy import TIER_ORDER, _tier_index
+from src.schemas.strategy import _tier_index
 
 
 class PairMetricsRead(BaseModel):
@@ -65,9 +65,7 @@ class PairMetricsRead(BaseModel):
     model_config = {"from_attributes": True}
 
     @model_serializer(mode="wrap")
-    def filter_by_tier(
-        self, handler: Any, info: SerializationInfo
-    ) -> dict[str, Any]:
+    def filter_by_tier(self, handler: Any, info: SerializationInfo) -> dict[str, Any]:
         """按会员等级过滤响应字段。
 
         从 info.context 中获取 membership，将低于该等级的字段置为 None。
@@ -76,9 +74,7 @@ class PairMetricsRead(BaseModel):
 
         # 确定当前用户等级
         context = info.context if info else None
-        membership: MembershipTier | None = (
-            context.get("membership") if isinstance(context, dict) else None
-        )
+        membership: MembershipTier | None = context.get("membership") if isinstance(context, dict) else None
         user_tier_idx = _tier_index(membership)
 
         # 遍历模型字段，过滤高于用户等级的字段

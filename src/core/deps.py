@@ -90,7 +90,7 @@ async def get_current_user(
     try:
         user_id = int(user_id_str)
     except (ValueError, TypeError):
-        raise AuthenticationError("token sub 字段无效")
+        raise AuthenticationError("token sub 字段无效") from None
 
     user = await db.get(User, user_id)
 
@@ -131,7 +131,7 @@ async def get_optional_user(
     if not auth_header.startswith("Bearer "):
         return None
 
-    token = auth_header[len("Bearer "):].strip()
+    token = auth_header[len("Bearer ") :].strip()
     if not token:
         return None
 
@@ -191,7 +191,7 @@ def require_membership(min_tier: MembershipTier) -> Callable[..., Any]:
             try:
                 user_tier = MembershipTier(user_tier)
             except ValueError:
-                raise MembershipError("无效的会员等级")
+                raise MembershipError("无效的会员等级") from None
 
         if _TIER_ORDER.index(user_tier) < _TIER_ORDER.index(min_tier):
             raise MembershipError("会员等级不足，请升级后访问")

@@ -59,9 +59,7 @@ async def login(
     - 成功：返回 code:0 及 {access_token, refresh_token, token_type}
     - 凭证错误：返回 code:1001 HTTP 401
     """
-    access_token, refresh_token = await _auth_service.login(
-        db, body.email, body.password
-    )
+    access_token, refresh_token = await _auth_service.login(db, body.email, body.password)
     return ok(data=TokenPair(access_token=access_token, refresh_token=refresh_token))
 
 
@@ -80,7 +78,5 @@ async def refresh_token(
     - 成功：返回 code:0 及 {access_token, token_type}
     - token 无效/过期/类型错误：返回 code:1001 HTTP 401
     """
-    new_access_token = await _auth_service.refresh_access_token(
-        db, body.refresh_token
-    )
+    new_access_token = await _auth_service.refresh_access_token(db, body.refresh_token)
     return ok(data=AccessToken(access_token=new_access_token))

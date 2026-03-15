@@ -10,12 +10,11 @@
 非 DB 测试不受影响。
 """
 
-import os
 
 import pytest
 
-
 # ─── 基础：标记注册验证 ──────────────────────────────────────────────────────────
+
 
 class TestIntegrationDbMarkerRegistered:
     """验证 pytest.mark.integration_db 已作为自定义标记注册（需求 8.5 / 任务 2 交付项）。"""
@@ -26,15 +25,14 @@ class TestIntegrationDbMarkerRegistered:
 
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
+
             # 在运行时给一个 dummy 函数打标记，看是否触发未知标记警告
             @pytest.mark.integration_db
             def _dummy() -> None:
                 pass
 
         unknown_mark_warnings = [
-            w for w in caught
-            if "PytestUnknownMarkWarning" in str(w.category)
-            and "integration_db" in str(w.message)
+            w for w in caught if "PytestUnknownMarkWarning" in str(w.category) and "integration_db" in str(w.message)
         ]
         assert not unknown_mark_warnings, (
             "integration_db 标记未注册，产生了 PytestUnknownMarkWarning。"
@@ -43,6 +41,7 @@ class TestIntegrationDbMarkerRegistered:
 
 
 # ─── 无 TEST_DATABASE_URL 时的跳过行为 ──────────────────────────────────────────
+
 
 class TestRealDbEngineSkipBehavior:
     """验证 real_db_engine fixture 在 TEST_DATABASE_URL 缺失时正确 skip（需求 8.5）。"""
@@ -61,9 +60,7 @@ class TestRealDbEngineSkipBehavior:
         with pytest.raises(pytest.skip.Exception) as exc_info:
             _check_test_database_url()
 
-        assert "TEST_DATABASE_URL" in str(exc_info.value), (
-            "skip 消息应明确说明 TEST_DATABASE_URL 未设置"
-        )
+        assert "TEST_DATABASE_URL" in str(exc_info.value), "skip 消息应明确说明 TEST_DATABASE_URL 未设置"
 
     def test_skip_message_is_descriptive(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """跳过原因消息应明确、可读，便于 CI 日志排查（需求 8.5）。"""
@@ -81,55 +78,55 @@ class TestRealDbEngineSkipBehavior:
 
 # ─── conftest 模块结构验证 ──────────────────────────────────────────────────────
 
+
 class TestIntegrationConftestStructure:
     """验证 tests/integration/conftest.py 模块存在且暴露所需的 fixtures / 辅助函数。"""
 
     def test_conftest_module_importable(self) -> None:
         """tests/integration/conftest.py 应可正常导入，无语法错误。"""
         import importlib
+
         mod = importlib.import_module("tests.integration.conftest")
         assert mod is not None
 
     def test_real_db_engine_fixture_defined(self) -> None:
         """real_db_engine fixture 应在 conftest 中定义。"""
         import importlib
+
         mod = importlib.import_module("tests.integration.conftest")
-        assert hasattr(mod, "real_db_engine"), (
-            "conftest.py 中应定义 real_db_engine fixture"
-        )
+        assert hasattr(mod, "real_db_engine"), "conftest.py 中应定义 real_db_engine fixture"
 
     def test_alembic_setup_fixture_defined(self) -> None:
         """alembic_setup fixture 应在 conftest 中定义。"""
         import importlib
+
         mod = importlib.import_module("tests.integration.conftest")
-        assert hasattr(mod, "alembic_setup"), (
-            "conftest.py 中应定义 alembic_setup fixture"
-        )
+        assert hasattr(mod, "alembic_setup"), "conftest.py 中应定义 alembic_setup fixture"
 
     def test_real_db_session_fixture_defined(self) -> None:
         """real_db_session fixture 应在 conftest 中定义。"""
         import importlib
+
         mod = importlib.import_module("tests.integration.conftest")
-        assert hasattr(mod, "real_db_session"), (
-            "conftest.py 中应定义 real_db_session fixture"
-        )
+        assert hasattr(mod, "real_db_session"), "conftest.py 中应定义 real_db_session fixture"
 
     def test_check_helper_function_defined(self) -> None:
         """_check_test_database_url 辅助函数应在 conftest 中定义（供 TDD 测试调用）。"""
         import importlib
+
         mod = importlib.import_module("tests.integration.conftest")
-        assert hasattr(mod, "_check_test_database_url"), (
-            "conftest.py 中应定义 _check_test_database_url 辅助函数"
-        )
+        assert hasattr(mod, "_check_test_database_url"), "conftest.py 中应定义 _check_test_database_url 辅助函数"
 
     def test_check_helper_is_callable(self) -> None:
         """_check_test_database_url 应是可调用对象。"""
         import importlib
+
         mod = importlib.import_module("tests.integration.conftest")
         assert callable(mod._check_test_database_url)
 
 
 # ─── 真实 DB 测试（仅在 TEST_DATABASE_URL 可用时运行）──────────────────────────
+
 
 @pytest.mark.integration_db
 class TestRealDbSessionIsolation:
@@ -143,9 +140,7 @@ class TestRealDbSessionIsolation:
         """real_db_session 应是可 await 的 AsyncSession 实例。"""
         from sqlalchemy.ext.asyncio import AsyncSession
 
-        assert isinstance(real_db_session, AsyncSession), (
-            "real_db_session 应为 AsyncSession 实例"
-        )
+        assert isinstance(real_db_session, AsyncSession), "real_db_session 应为 AsyncSession 实例"
 
     async def test_real_db_session_can_execute_query(self, real_db_session) -> None:  # type: ignore[no-untyped-def]
         """real_db_session 应能执行简单 SQL 查询（验证真实 DB 连接有效）。"""
@@ -163,7 +158,4 @@ class TestRealDbSessionIsolation:
         # 检查 users 表是否为空（TRUNCATE 后应为空）
         result = await real_db_session.execute(text("SELECT COUNT(*) FROM users"))
         count = result.scalar()
-        assert count == 0, (
-            "real_db_session fixture 应在测试开始前 TRUNCATE users 表，"
-            f"但发现 {count} 条记录"
-        )
+        assert count == 0, f"real_db_session fixture 应在测试开始前 TRUNCATE users 表，但发现 {count} 条记录"

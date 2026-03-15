@@ -21,8 +21,8 @@ class TestRunBacktestSubprocess:
 
     def test_timeout_raises_freqtrade_timeout_error(self, tmp_path: Path) -> None:
         """subprocess 超时时抛出 FreqtradeTimeoutError。"""
-        from src.freqtrade_bridge.exceptions import FreqtradeTimeoutError
         from src.freqtrade_bridge.backtester import run_backtest_subprocess
+        from src.freqtrade_bridge.exceptions import FreqtradeTimeoutError
 
         config_path = tmp_path / "config.json"
         config_path.write_text("{}")
@@ -33,8 +33,8 @@ class TestRunBacktestSubprocess:
 
     def test_nonzero_exit_code_raises_execution_error(self, tmp_path: Path) -> None:
         """非零退出码时抛出 FreqtradeExecutionError。"""
-        from src.freqtrade_bridge.exceptions import FreqtradeExecutionError
         from src.freqtrade_bridge.backtester import run_backtest_subprocess
+        from src.freqtrade_bridge.exceptions import FreqtradeExecutionError
 
         config_path = tmp_path / "config.json"
         config_path.write_text("{}")
@@ -50,8 +50,8 @@ class TestRunBacktestSubprocess:
 
     def test_stderr_not_exposed_in_exception_message(self, tmp_path: Path) -> None:
         """FreqtradeExecutionError 不暴露原始 freqtrade stderr。"""
-        from src.freqtrade_bridge.exceptions import FreqtradeExecutionError
         from src.freqtrade_bridge.backtester import run_backtest_subprocess
+        from src.freqtrade_bridge.exceptions import FreqtradeExecutionError
 
         config_path = tmp_path / "config.json"
         config_path.write_text("{}")
@@ -108,9 +108,7 @@ class TestRunBacktestSubprocess:
             run_backtest_subprocess(config_path, "TestStrategy", timeout=300)
 
         call_kwargs = mock_run.call_args
-        assert call_kwargs.kwargs.get("timeout") == 300 or (
-            len(call_kwargs.args) > 1 and call_kwargs.args[1] == 300
-        )
+        assert call_kwargs.kwargs.get("timeout") == 300 or (len(call_kwargs.args) > 1 and call_kwargs.args[1] == 300)
 
 
 class TestGenerateConfig:
@@ -181,7 +179,7 @@ class TestCleanupTaskDir:
 
     def test_cleanup_called_on_success_path(self, tmp_path: Path) -> None:
         """run_backtest_subprocess 成功时，隔离目录应被清理（通过 finally 块）。"""
-        from src.freqtrade_bridge.runner import generate_config, cleanup_task_dir
+        from src.freqtrade_bridge.runner import cleanup_task_dir, generate_config
 
         task_dir = tmp_path / "task_cleanup_test"
         task_dir.mkdir()
@@ -280,8 +278,8 @@ class TestFetchSignals:
     def test_fetch_signals_failure_raises_execution_error(self) -> None:
         """信号获取失败时抛出 FreqtradeExecutionError。"""
         import asyncio
-        from concurrent.futures import ProcessPoolExecutor
         from unittest.mock import patch
+
         from src.freqtrade_bridge.exceptions import FreqtradeExecutionError
         from src.freqtrade_bridge.signal_fetcher import fetch_signals
 
@@ -290,11 +288,10 @@ class TestFetchSignals:
             "src.freqtrade_bridge.signal_fetcher._fetch_signals_sync",
             side_effect=RuntimeError("freqtrade module import failed"),
         ):
-            with patch(
-                "src.freqtrade_bridge.signal_fetcher._executor"
-            ) as mock_executor:
+            with patch("src.freqtrade_bridge.signal_fetcher._executor") as mock_executor:
                 # 模拟 executor.submit 返回一个失败的 future
                 import concurrent.futures
+
                 future: concurrent.futures.Future = concurrent.futures.Future()
                 future.set_exception(RuntimeError("freqtrade module import failed"))
                 mock_executor.submit.return_value = future

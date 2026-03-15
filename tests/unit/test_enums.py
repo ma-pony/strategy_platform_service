@@ -4,7 +4,6 @@
 以及 pydantic-settings 配置加载逻辑。
 """
 
-import os
 
 import pytest
 
@@ -82,9 +81,7 @@ class TestAppSettings:
         """SECRET_KEY 能从环境变量正确读取。"""
         monkeypatch.setenv("SECRET_KEY", "test-secret-key-value")
         monkeypatch.setenv("DATABASE_URL", "postgresql+asyncpg://user:pass@localhost/db")
-        monkeypatch.setenv(
-            "DATABASE_SYNC_URL", "postgresql+psycopg2://user:pass@localhost/db"
-        )
+        monkeypatch.setenv("DATABASE_SYNC_URL", "postgresql+psycopg2://user:pass@localhost/db")
         monkeypatch.setenv("REDIS_URL", "redis://localhost:6379/0")
 
         # 清除 lru_cache 以确保重新加载
@@ -97,12 +94,8 @@ class TestAppSettings:
     def test_settings_loads_database_url(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """DATABASE_URL 能从环境变量正确读取。"""
         monkeypatch.setenv("SECRET_KEY", "test-secret-key-value")
-        monkeypatch.setenv(
-            "DATABASE_URL", "postgresql+asyncpg://user:pass@localhost/testdb"
-        )
-        monkeypatch.setenv(
-            "DATABASE_SYNC_URL", "postgresql+psycopg2://user:pass@localhost/testdb"
-        )
+        monkeypatch.setenv("DATABASE_URL", "postgresql+asyncpg://user:pass@localhost/testdb")
+        monkeypatch.setenv("DATABASE_SYNC_URL", "postgresql+psycopg2://user:pass@localhost/testdb")
         monkeypatch.setenv("REDIS_URL", "redis://localhost:6379/0")
 
         from src.core import app_settings
@@ -114,12 +107,8 @@ class TestAppSettings:
     def test_settings_loads_redis_url(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """REDIS_URL 能从环境变量正确读取。"""
         monkeypatch.setenv("SECRET_KEY", "test-secret-key-value")
-        monkeypatch.setenv(
-            "DATABASE_URL", "postgresql+asyncpg://user:pass@localhost/db"
-        )
-        monkeypatch.setenv(
-            "DATABASE_SYNC_URL", "postgresql+psycopg2://user:pass@localhost/db"
-        )
+        monkeypatch.setenv("DATABASE_URL", "postgresql+asyncpg://user:pass@localhost/db")
+        monkeypatch.setenv("DATABASE_SYNC_URL", "postgresql+psycopg2://user:pass@localhost/db")
         monkeypatch.setenv("REDIS_URL", "redis://localhost:6379/2")
 
         from src.core import app_settings
@@ -131,16 +120,12 @@ class TestAppSettings:
     def test_settings_no_hardcoded_secret(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """SECRET_KEY 必须通过环境变量注入，缺失时应抛出校验异常。"""
         monkeypatch.delenv("SECRET_KEY", raising=False)
-        monkeypatch.setenv(
-            "DATABASE_URL", "postgresql+asyncpg://user:pass@localhost/db"
-        )
-        monkeypatch.setenv(
-            "DATABASE_SYNC_URL", "postgresql+psycopg2://user:pass@localhost/db"
-        )
+        monkeypatch.setenv("DATABASE_URL", "postgresql+asyncpg://user:pass@localhost/db")
+        monkeypatch.setenv("DATABASE_SYNC_URL", "postgresql+psycopg2://user:pass@localhost/db")
         monkeypatch.setenv("REDIS_URL", "redis://localhost:6379/0")
 
         from src.core.app_settings import AppSettings
 
         # 禁用 .env 文件读取，确保仅从环境变量加载
-        with pytest.raises(Exception):
+        with pytest.raises(Exception):  # noqa: B017
             AppSettings(_env_file=None)

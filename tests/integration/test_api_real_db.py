@@ -63,6 +63,7 @@ def env_setup(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("REDIS_URL", "redis://localhost:6379/0")
 
     from src.core import app_settings
+
     app_settings.get_settings.cache_clear()
     yield
     app_settings.get_settings.cache_clear()
@@ -130,6 +131,7 @@ async def db_session(db_engine: AsyncEngine) -> AsyncSession:
 def app(env_setup):
     """创建 FastAPI 应用实例。"""
     from src.api.main_router import create_app
+
     return create_app()
 
 
@@ -143,9 +145,7 @@ async def client(app, db_session: AsyncSession) -> AsyncClient:
 
     app.dependency_overrides[get_db] = override_get_db
 
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as ac:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         yield ac
 
     app.dependency_overrides.clear()
@@ -163,6 +163,7 @@ async def _create_user(
 ) -> User:
     """在真实数据库中创建用户。"""
     from src.core.security import SecurityUtils
+
     security = SecurityUtils()
     user = User(
         email=email,
@@ -228,10 +229,13 @@ async def _create_signal(
 
 async def _login_and_get_token(client: AsyncClient, email: str, password: str) -> str:
     """登录并返回 access_token。"""
-    resp = await client.post("/api/v1/auth/login", json={
-        "email": email,
-        "password": password,
-    })
+    resp = await client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": email,
+            "password": password,
+        },
+    )
     assert resp.status_code == 200, f"login failed: {resp.json()}"
     return resp.json()["data"]["access_token"]
 
@@ -245,10 +249,13 @@ class TestAuthRegisterRealDB:
     @pytest.mark.asyncio
     async def test_register_success(self, client: AsyncClient, db_session: AsyncSession) -> None:
         """注册成功返回用户信息，membership 默认 FREE。"""
-        resp = await client.post("/api/v1/auth/register", json={
-            "email": "newuser@example.com",
-            "password": "strongpass123",
-        })
+        resp = await client.post(
+            "/api/v1/auth/register",
+            json={
+                "email": "newuser@example.com",
+                "password": "strongpass123",
+            },
+        )
         assert resp.status_code == 200
         data = resp.json()
         assert data["code"] == 0
@@ -259,20 +266,26 @@ class TestAuthRegisterRealDB:
     async def test_register_duplicate_email(self, client: AsyncClient, db_session: AsyncSession) -> None:
         """重复邮箱返回 code:3010 HTTP 409。"""
         await _create_user(db_session, email="existing@example.com")
-        resp = await client.post("/api/v1/auth/register", json={
-            "email": "existing@example.com",
-            "password": "strongpass123",
-        })
+        resp = await client.post(
+            "/api/v1/auth/register",
+            json={
+                "email": "existing@example.com",
+                "password": "strongpass123",
+            },
+        )
         assert resp.status_code == 409
         assert resp.json()["code"] == 3010
 
     @pytest.mark.asyncio
     async def test_register_short_password_422(self, client: AsyncClient) -> None:
         """密码过短返回 422 参数校验错误。"""
-        resp = await client.post("/api/v1/auth/register", json={
-            "email": "shortpw@example.com",
-            "password": "1234567",  # min_length=8
-        })
+        resp = await client.post(
+            "/api/v1/auth/register",
+            json={
+                "email": "shortpw@example.com",
+                "password": "1234567",  # min_length=8
+            },
+        )
         assert resp.status_code == 422
         assert resp.json()["code"] == 2001
 
@@ -284,10 +297,13 @@ class TestAuthLoginRealDB:
     async def test_login_success(self, client: AsyncClient, db_session: AsyncSession) -> None:
         """正确凭证登录成功，返回 token 对。"""
         await _create_user(db_session, email="loginuser@example.com", password="testpass123")
-        resp = await client.post("/api/v1/auth/login", json={
-            "email": "loginuser@example.com",
-            "password": "testpass123",
-        })
+        resp = await client.post(
+            "/api/v1/auth/login",
+            json={
+                "email": "loginuser@example.com",
+                "password": "testpass123",
+            },
+        )
         assert resp.status_code == 200
         data = resp.json()
         assert data["code"] == 0
@@ -299,33 +315,40 @@ class TestAuthLoginRealDB:
     async def test_login_wrong_password(self, client: AsyncClient, db_session: AsyncSession) -> None:
         """密码错误返回 code:1004 HTTP 401。"""
         await _create_user(db_session, email="wrongpw@example.com", password="correctpass")
-        resp = await client.post("/api/v1/auth/login", json={
-            "email": "wrongpw@example.com",
-            "password": "wrongpass",
-        })
+        resp = await client.post(
+            "/api/v1/auth/login",
+            json={
+                "email": "wrongpw@example.com",
+                "password": "wrongpass",
+            },
+        )
         assert resp.status_code == 401
         assert resp.json()["code"] == 1004
 
     @pytest.mark.asyncio
     async def test_login_nonexistent_user(self, client: AsyncClient) -> None:
         """用户不存在返回 code:1004（不泄露是否存在）。"""
-        resp = await client.post("/api/v1/auth/login", json={
-            "email": "ghost@example.com",
-            "password": "anypass12345",
-        })
+        resp = await client.post(
+            "/api/v1/auth/login",
+            json={
+                "email": "ghost@example.com",
+                "password": "anypass12345",
+            },
+        )
         assert resp.status_code == 401
         assert resp.json()["code"] == 1004
 
     @pytest.mark.asyncio
     async def test_login_inactive_user(self, client: AsyncClient, db_session: AsyncSession) -> None:
         """被禁用用户登录返回 code:1005 HTTP 403。"""
-        await _create_user(
-            db_session, email="banned@example.com", password="testpass123", is_active=False
+        await _create_user(db_session, email="banned@example.com", password="testpass123", is_active=False)
+        resp = await client.post(
+            "/api/v1/auth/login",
+            json={
+                "email": "banned@example.com",
+                "password": "testpass123",
+            },
         )
-        resp = await client.post("/api/v1/auth/login", json={
-            "email": "banned@example.com",
-            "password": "testpass123",
-        })
         assert resp.status_code == 403
         assert resp.json()["code"] == 1005
 
@@ -337,15 +360,21 @@ class TestAuthRefreshRealDB:
     async def test_refresh_success(self, client: AsyncClient, db_session: AsyncSession) -> None:
         """有效 refresh_token 返回新 access_token。"""
         await _create_user(db_session, email="refreshuser@example.com", password="testpass123")
-        login_resp = await client.post("/api/v1/auth/login", json={
-            "email": "refreshuser@example.com",
-            "password": "testpass123",
-        })
+        login_resp = await client.post(
+            "/api/v1/auth/login",
+            json={
+                "email": "refreshuser@example.com",
+                "password": "testpass123",
+            },
+        )
         refresh_token = login_resp.json()["data"]["refresh_token"]
 
-        resp = await client.post("/api/v1/auth/refresh", json={
-            "refresh_token": refresh_token,
-        })
+        resp = await client.post(
+            "/api/v1/auth/refresh",
+            json={
+                "refresh_token": refresh_token,
+            },
+        )
         assert resp.status_code == 200
         data = resp.json()
         assert data["code"] == 0
@@ -354,9 +383,12 @@ class TestAuthRefreshRealDB:
     @pytest.mark.asyncio
     async def test_refresh_invalid_token(self, client: AsyncClient) -> None:
         """无效 token 返回 code:1001。"""
-        resp = await client.post("/api/v1/auth/refresh", json={
-            "refresh_token": "invalid.token.here",
-        })
+        resp = await client.post(
+            "/api/v1/auth/refresh",
+            json={
+                "refresh_token": "invalid.token.here",
+            },
+        )
         assert resp.status_code == 401
         assert resp.json()["code"] == 1001
 
@@ -364,37 +396,47 @@ class TestAuthRefreshRealDB:
     async def test_refresh_with_access_token_fails(self, client: AsyncClient, db_session: AsyncSession) -> None:
         """用 access_token 做 refresh 应失败（type 不匹配）。"""
         await _create_user(db_session, email="typecheck@example.com", password="testpass123")
-        login_resp = await client.post("/api/v1/auth/login", json={
-            "email": "typecheck@example.com",
-            "password": "testpass123",
-        })
+        login_resp = await client.post(
+            "/api/v1/auth/login",
+            json={
+                "email": "typecheck@example.com",
+                "password": "testpass123",
+            },
+        )
         access_token = login_resp.json()["data"]["access_token"]
 
-        resp = await client.post("/api/v1/auth/refresh", json={
-            "refresh_token": access_token,
-        })
+        resp = await client.post(
+            "/api/v1/auth/refresh",
+            json={
+                "refresh_token": access_token,
+            },
+        )
         assert resp.status_code == 401
         assert resp.json()["code"] == 1001
 
     @pytest.mark.asyncio
     async def test_refresh_inactive_user(self, client: AsyncClient, db_session: AsyncSession) -> None:
         """用户登录后被禁用，refresh 应失败。"""
-        user = await _create_user(
-            db_session, email="willban@example.com", password="testpass123"
+        user = await _create_user(db_session, email="willban@example.com", password="testpass123")
+        login_resp = await client.post(
+            "/api/v1/auth/login",
+            json={
+                "email": "willban@example.com",
+                "password": "testpass123",
+            },
         )
-        login_resp = await client.post("/api/v1/auth/login", json={
-            "email": "willban@example.com",
-            "password": "testpass123",
-        })
         refresh_token = login_resp.json()["data"]["refresh_token"]
 
         # 禁用用户
         user.is_active = False
         await db_session.commit()
 
-        resp = await client.post("/api/v1/auth/refresh", json={
-            "refresh_token": refresh_token,
-        })
+        resp = await client.post(
+            "/api/v1/auth/refresh",
+            json={
+                "refresh_token": refresh_token,
+            },
+        )
         assert resp.status_code == 401
         assert resp.json()["code"] == 1001
 
@@ -461,12 +503,12 @@ class TestStrategyListRealDB:
         assert item["trade_count"] is None
 
     @pytest.mark.asyncio
-    async def test_list_free_user_sees_free_fields(
-        self, client: AsyncClient, db_session: AsyncSession
-    ) -> None:
+    async def test_list_free_user_sees_free_fields(self, client: AsyncClient, db_session: AsyncSession) -> None:
         """Free 用户可见 trade_count, max_drawdown；不可见 sharpe_ratio, win_rate。"""
         await _create_user(
-            db_session, email="freeuser@example.com", password="testpass123",
+            db_session,
+            email="freeuser@example.com",
+            password="testpass123",
             membership=MembershipTier.FREE,
         )
         strategy = await _create_strategy(db_session, name="FreeStrat")
@@ -488,12 +530,12 @@ class TestStrategyListRealDB:
         assert item["win_rate"] is None
 
     @pytest.mark.asyncio
-    async def test_list_vip1_user_sees_all_fields(
-        self, client: AsyncClient, db_session: AsyncSession
-    ) -> None:
+    async def test_list_vip1_user_sees_all_fields(self, client: AsyncClient, db_session: AsyncSession) -> None:
         """VIP1 用户可见全部字段。"""
         await _create_user(
-            db_session, email="vip1user@example.com", password="testpass123",
+            db_session,
+            email="vip1user@example.com",
+            password="testpass123",
             membership=MembershipTier.VIP1,
         )
         strategy = await _create_strategy(db_session, name="VipAllStrat")
@@ -562,8 +604,10 @@ class TestSignalApiRealDB:
         """真实信号数据正确返回，字段完整。"""
         strategy = await _create_strategy(db_session, name="SigStrat")
         await _create_signal(
-            db_session, strategy.id,
-            pair="ETH/USDT", direction=SignalDirection.SELL,
+            db_session,
+            strategy.id,
+            pair="ETH/USDT",
+            direction=SignalDirection.SELL,
             confidence_score=0.92,
         )
 
@@ -577,12 +621,12 @@ class TestSignalApiRealDB:
         assert signals[0]["confidence_score"] is None
 
     @pytest.mark.asyncio
-    async def test_signals_vip_sees_confidence(
-        self, client: AsyncClient, db_session: AsyncSession
-    ) -> None:
+    async def test_signals_vip_sees_confidence(self, client: AsyncClient, db_session: AsyncSession) -> None:
         """VIP 用户可见 confidence_score 字段。"""
         await _create_user(
-            db_session, email="sigvip@example.com", password="testpass123",
+            db_session,
+            email="sigvip@example.com",
+            password="testpass123",
             membership=MembershipTier.VIP1,
         )
         strategy = await _create_strategy(db_session, name="SigVipStrat")
@@ -602,11 +646,15 @@ class TestSignalApiRealDB:
         strategy = await _create_strategy(db_session, name="SigOrderStrat")
         now = datetime.datetime.now(tz=datetime.timezone.utc)
         await _create_signal(
-            db_session, strategy.id, pair="BTC/USDT",
+            db_session,
+            strategy.id,
+            pair="BTC/USDT",
             signal_at=now - datetime.timedelta(hours=2),
         )
         await _create_signal(
-            db_session, strategy.id, pair="ETH/USDT",
+            db_session,
+            strategy.id,
+            pair="ETH/USDT",
             signal_at=now,
         )
 
@@ -624,7 +672,8 @@ class TestSignalApiRealDB:
         now = datetime.datetime.now(tz=datetime.timezone.utc)
         for i in range(5):
             await _create_signal(
-                db_session, strategy.id,
+                db_session,
+                strategy.id,
                 signal_at=now - datetime.timedelta(hours=i),
             )
 
@@ -702,12 +751,12 @@ class TestBacktestDetailRealDB:
         assert resp.json()["code"] == 3001
 
     @pytest.mark.asyncio
-    async def test_backtest_detail_vip_sees_all(
-        self, client: AsyncClient, db_session: AsyncSession
-    ) -> None:
+    async def test_backtest_detail_vip_sees_all(self, client: AsyncClient, db_session: AsyncSession) -> None:
         """VIP 用户可见回测全部字段。"""
         await _create_user(
-            db_session, email="btvip@example.com", password="testpass123",
+            db_session,
+            email="btvip@example.com",
+            password="testpass123",
             membership=MembershipTier.VIP1,
         )
         strategy = await _create_strategy(db_session, name="BTDetailStrat")
@@ -757,12 +806,12 @@ class TestProtectedEndpointsRealDB:
     """需要认证的端点真实数据库测试。"""
 
     @pytest.mark.asyncio
-    async def test_access_with_valid_token(
-        self, client: AsyncClient, db_session: AsyncSession
-    ) -> None:
+    async def test_access_with_valid_token(self, client: AsyncClient, db_session: AsyncSession) -> None:
         """有效 token 正常访问受保护端点。"""
         await _create_user(
-            db_session, email="authed@example.com", password="testpass123",
+            db_session,
+            email="authed@example.com",
+            password="testpass123",
             membership=MembershipTier.VIP1,
         )
         strategy = await _create_strategy(db_session, name="AuthStrat")
@@ -779,12 +828,12 @@ class TestProtectedEndpointsRealDB:
         assert signals[0]["confidence_score"] is not None
 
     @pytest.mark.asyncio
-    async def test_disabled_user_token_rejected(
-        self, client: AsyncClient, db_session: AsyncSession
-    ) -> None:
+    async def test_disabled_user_token_rejected(self, client: AsyncClient, db_session: AsyncSession) -> None:
         """用户登录后被禁用，旧 token 在宽松鉴权接口降级为匿名。"""
         user = await _create_user(
-            db_session, email="disabling@example.com", password="testpass123",
+            db_session,
+            email="disabling@example.com",
+            password="testpass123",
             membership=MembershipTier.VIP1,
         )
         strategy = await _create_strategy(db_session, name="DisableStrat")
@@ -816,18 +865,24 @@ class TestFullAuthFlowRealDB:
     async def test_full_flow(self, client: AsyncClient, db_session: AsyncSession) -> None:
         """完整认证流程：注册 → 登录 → 用 token 获取策略 → 刷新 token → 再次获取。"""
         # 1. 注册
-        reg_resp = await client.post("/api/v1/auth/register", json={
-            "email": "flowuser@example.com",
-            "password": "testpass123",
-        })
+        reg_resp = await client.post(
+            "/api/v1/auth/register",
+            json={
+                "email": "flowuser@example.com",
+                "password": "testpass123",
+            },
+        )
         assert reg_resp.status_code == 200
         assert reg_resp.json()["data"]["email"] == "flowuser@example.com"
 
         # 2. 登录
-        login_resp = await client.post("/api/v1/auth/login", json={
-            "email": "flowuser@example.com",
-            "password": "testpass123",
-        })
+        login_resp = await client.post(
+            "/api/v1/auth/login",
+            json={
+                "email": "flowuser@example.com",
+                "password": "testpass123",
+            },
+        )
         assert login_resp.status_code == 200
         tokens = login_resp.json()["data"]
         access_token = tokens["access_token"]
@@ -843,9 +898,12 @@ class TestFullAuthFlowRealDB:
         assert list_resp.json()["data"]["total"] >= 1
 
         # 4. 刷新 token
-        refresh_resp = await client.post("/api/v1/auth/refresh", json={
-            "refresh_token": refresh_token,
-        })
+        refresh_resp = await client.post(
+            "/api/v1/auth/refresh",
+            json={
+                "refresh_token": refresh_token,
+            },
+        )
         assert refresh_resp.status_code == 200
         new_access = refresh_resp.json()["data"]["access_token"]
 

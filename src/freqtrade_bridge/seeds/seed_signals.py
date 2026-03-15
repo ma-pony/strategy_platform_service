@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session
 from src.models.signal import TradingSignal
 
 # 真实 OHLCV 数据路径（freqtrade download-data 输出目录）
-_DATA_DIR = Path("/tmp/freqtrade_data")
+_DATA_DIR = Path("/tmp/freqtrade_data")  # noqa: S108
 
 # 排名前五的币种及对应数据文件
 _PAIR_FILES = {
@@ -97,9 +97,7 @@ def _extract_all_signals(
         # 确定方向
         if enter_long == 1:
             direction = "buy"
-        elif enter_short == 1:
-            direction = "sell"
-        elif exit_long == 1:
+        elif enter_short == 1 or exit_long == 1:
             direction = "sell"
         elif exit_short == 1:
             direction = "buy"
@@ -154,9 +152,18 @@ def _extract_all_signals(
 
         # 收集指标快照
         _skip_cols = {
-            "date", "open", "high", "low", "close", "volume",
-            "enter_long", "exit_long", "enter_short", "exit_short",
-            "enter_tag", "exit_tag",
+            "date",
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume",
+            "enter_long",
+            "exit_long",
+            "enter_short",
+            "exit_short",
+            "enter_tag",
+            "exit_tag",
         }
         indicator_values: dict[str, Any] = {}
         for col in df.columns:
@@ -185,22 +192,24 @@ def _extract_all_signals(
         if signal_at.tzinfo is None:
             signal_at = signal_at.replace(tzinfo=timezone.utc)
 
-        signals.append({
-            "strategy_id": strategy_id,
-            "pair": pair,
-            "direction": direction,
-            "confidence_score": round(confidence, 4),
-            "signal_at": signal_at,
-            "signal_source": "backtest",
-            "entry_price": round(close_price, 2),
-            "stop_loss": round(stop_loss, 2),
-            "take_profit": round(take_profit, 2),
-            "timeframe": "4h",
-            "signal_strength": round(signal_strength, 4),
-            "volume": round(volume, 2),
-            "volatility": round(volatility, 8),
-            "indicator_values": indicator_values,
-        })
+        signals.append(
+            {
+                "strategy_id": strategy_id,
+                "pair": pair,
+                "direction": direction,
+                "confidence_score": round(confidence, 4),
+                "signal_at": signal_at,
+                "signal_source": "backtest",
+                "entry_price": round(close_price, 2),
+                "stop_loss": round(stop_loss, 2),
+                "take_profit": round(take_profit, 2),
+                "timeframe": "4h",
+                "signal_strength": round(signal_strength, 4),
+                "volume": round(volume, 2),
+                "volatility": round(volatility, 8),
+                "indicator_values": indicator_values,
+            }
+        )
 
     return signals
 
@@ -210,10 +219,7 @@ def seed_signals(session: Session) -> int:
     from src.models.strategy import Strategy
 
     # 获取策略 ID 映射
-    strategies = {
-        row.name: row.id
-        for row in session.execute(sa.select(Strategy.name, Strategy.id)).fetchall()
-    }
+    strategies = {row.name: row.id for row in session.execute(sa.select(Strategy.name, Strategy.id)).fetchall()}
 
     total_inserted = 0
 

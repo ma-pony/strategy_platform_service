@@ -7,7 +7,7 @@
 需求可追溯：3.1, 3.2, 3.4
 """
 
-from unittest.mock import MagicMock, patch, AsyncMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -21,6 +21,7 @@ def env_setup(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("REDIS_URL", "redis://localhost:6379/0")
 
     from src.core import app_settings
+
     app_settings.get_settings.cache_clear()
     yield
     app_settings.get_settings.cache_clear()
@@ -55,9 +56,7 @@ class TestLiveMetricsChain:
                 "src.workers.tasks.signal_tasks.compute_live_metrics",
                 return_value=mock_metrics,
             ),
-            patch(
-                "src.workers.tasks.signal_tasks.upsert_pair_metrics"
-            ) as mock_upsert,
+            patch("src.workers.tasks.signal_tasks.upsert_pair_metrics") as mock_upsert,
         ):
             try_upsert_live_metrics(
                 strategy_id=1,
@@ -125,7 +124,13 @@ class TestLiveMetricsChain:
         """try_upsert_live_metrics 应使用独立的 SyncSessionLocal，不污染信号写入事务（需求 3.4）。"""
         from src.workers.tasks.signal_tasks import try_upsert_live_metrics
 
-        mock_metrics = {"total_return": 0.1, "profit_factor": None, "max_drawdown": None, "sharpe_ratio": None, "trade_count": 5}
+        mock_metrics = {
+            "total_return": 0.1,
+            "profit_factor": None,
+            "max_drawdown": None,
+            "sharpe_ratio": None,
+            "trade_count": 5,
+        }
 
         session_factory_calls = []
 

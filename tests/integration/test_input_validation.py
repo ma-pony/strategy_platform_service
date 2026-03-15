@@ -46,9 +46,7 @@ def app(env_setup):
 @pytest.fixture()
 async def client(app) -> AsyncGenerator[AsyncClient, None]:
     """提供绑定测试应用的异步 HTTP 客户端。"""
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as ac:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         yield ac
 
 
@@ -56,9 +54,7 @@ class TestMissingRequiredField:
     """需求 6.1：缺少必填字段时返回 code:2001 + 字段级校验详情。"""
 
     @pytest.mark.asyncio
-    async def test_login_missing_password_returns_422_with_code_2001(
-        self, client: AsyncClient
-    ) -> None:
+    async def test_login_missing_password_returns_422_with_code_2001(self, client: AsyncClient) -> None:
         """登录接口省略 password 字段 → HTTP 422 + code:2001 + data 为非空列表。
 
         验证：
@@ -87,9 +83,7 @@ class TestWrongTypeField:
     """需求 6.2：字段类型错误时返回 code:2001 + HTTP 422。"""
 
     @pytest.mark.asyncio
-    async def test_login_password_as_integer_returns_422_with_code_2001(
-        self, client: AsyncClient
-    ) -> None:
+    async def test_login_password_as_integer_returns_422_with_code_2001(self, client: AsyncClient) -> None:
         """登录接口 password 传入整型 → HTTP 422 + code:2001。
 
         验证：
@@ -110,9 +104,7 @@ class TestRequestValidationErrorEnvelope:
     """需求 6.3：RequestValidationError 被转换为统一信封格式（非 FastAPI 默认 422 格式）。"""
 
     @pytest.mark.asyncio
-    async def test_validation_error_returns_unified_envelope_not_fastapi_default(
-        self, client: AsyncClient
-    ) -> None:
+    async def test_validation_error_returns_unified_envelope_not_fastapi_default(self, client: AsyncClient) -> None:
         """验证 RequestValidationError 响应体为统一信封格式，而非 FastAPI 原始格式。
 
         FastAPI 默认 422 响应格式为 {"detail": [...]}, 本测试确认响应格式为
@@ -137,9 +129,7 @@ class TestNonNumericPathParam:
     """需求 6.4：路径参数包含非数字字符时返回 422（非 500）。"""
 
     @pytest.mark.asyncio
-    async def test_non_numeric_strategy_id_returns_422_not_500(
-        self, client: AsyncClient
-    ) -> None:
+    async def test_non_numeric_strategy_id_returns_422_not_500(self, client: AsyncClient) -> None:
         """GET /api/v1/strategies/abc → HTTP 422 + code:2001（非 HTTP 500）。
 
         需求 6.4：路径参数非数字时，系统返回参数校验错误而非服务端错误。
@@ -157,9 +147,7 @@ class TestErrorResponseEnvelopeFormat:
     """需求 6.5：所有错误响应（4xx、5xx）符合统一信封格式，不暴露 Python traceback。"""
 
     @pytest.mark.asyncio
-    async def test_401_response_has_unified_envelope(
-        self, client: AsyncClient
-    ) -> None:
+    async def test_401_response_has_unified_envelope(self, client: AsyncClient) -> None:
         """调用需要认证的接口（无 token）→ HTTP 401，响应含 code、message、data。
 
         需求 6.5：401 响应符合统一信封格式。
@@ -176,12 +164,10 @@ class TestErrorResponseEnvelopeFormat:
         # 确认不含 Python traceback 关键词
         body_str = str(body)
         assert "Traceback" not in body_str
-        assert "File \"" not in body_str
+        assert 'File "' not in body_str
 
     @pytest.mark.asyncio
-    async def test_404_response_has_unified_envelope(
-        self, client: AsyncClient, app
-    ) -> None:
+    async def test_404_response_has_unified_envelope(self, client: AsyncClient, app) -> None:
         """请求不存在的策略 ID → HTTP 404，响应含 code、message、data，不含 traceback。
 
         需求 6.5：404 响应符合统一信封格式。
@@ -214,12 +200,10 @@ class TestErrorResponseEnvelopeFormat:
         # 确认不含 Python traceback 关键词
         body_str = str(body)
         assert "Traceback" not in body_str
-        assert "File \"" not in body_str
+        assert 'File "' not in body_str
 
     @pytest.mark.asyncio
-    async def test_403_response_has_unified_envelope(
-        self, client: AsyncClient, app
-    ) -> None:
+    async def test_403_response_has_unified_envelope(self, client: AsyncClient, app) -> None:
         """非管理员访问 admin 接口 → HTTP 403，响应含 code、message、data。
 
         需求 6.5：403 响应符合统一信封格式。
@@ -228,9 +212,7 @@ class TestErrorResponseEnvelopeFormat:
 
         from src.core.deps import get_current_user
 
-        normal_user = SimpleNamespace(
-            id=2, email="user@example.com", membership="free", is_active=True, is_admin=False
-        )
+        normal_user = SimpleNamespace(id=2, email="user@example.com", membership="free", is_active=True, is_admin=False)
         app.dependency_overrides[get_current_user] = lambda: normal_user
         try:
             resp = await client.post(
@@ -248,4 +230,4 @@ class TestErrorResponseEnvelopeFormat:
         # 确认不含 Python traceback 关键词
         body_str = str(body)
         assert "Traceback" not in body_str
-        assert "File \"" not in body_str
+        assert 'File "' not in body_str

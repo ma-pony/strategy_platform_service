@@ -8,10 +8,10 @@
   - mock_db：预配置的 AsyncMock 数据库 session
 """
 
-import pytest
+from unittest.mock import AsyncMock
+
 from fastapi import FastAPI
 from httpx import AsyncClient
-from unittest.mock import AsyncMock
 
 
 class TestEnvSetupFixture:

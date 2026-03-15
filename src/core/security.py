@@ -38,9 +38,7 @@ class SecurityUtils:
     def _get_secret_key(self) -> str:
         return get_settings().secret_key
 
-    def create_access_token(
-        self, sub: str, membership: MembershipTier
-    ) -> str:
+    def create_access_token(self, sub: str, membership: MembershipTier) -> str:
         """签发 access_token，有效期 30 分钟。
 
         JWT claims 包含：sub、membership、exp、iat、type="access"。
@@ -72,9 +70,7 @@ class SecurityUtils:
         }
         return jwt.encode(payload, self._get_secret_key(), algorithm=_ALGORITHM)
 
-    def decode_token(
-        self, token: str, expected_type: str = "access"
-    ) -> dict[str, Any]:
+    def decode_token(self, token: str, expected_type: str = "access") -> dict[str, Any]:
         """校验并解码 JWT token。
 
         校验项：
@@ -99,12 +95,10 @@ class SecurityUtils:
                 algorithms=[_ALGORITHM],
             )
         except JWTError:
-            raise AuthenticationError("token 无效或已过期")
+            raise AuthenticationError("token 无效或已过期") from None
 
         if payload.get("type") != expected_type:
-            raise AuthenticationError(
-                f"token 类型错误，期望 {expected_type}，实际 {payload.get('type')}"
-            )
+            raise AuthenticationError(f"token 类型错误，期望 {expected_type}，实际 {payload.get('type')}")
 
         return payload
 

@@ -39,9 +39,7 @@ class TestSettingsFactory:
         assert settings.app_env == "test"
         assert settings.debug is True
 
-    def test_settings_cache_returns_same_instance(
-        self, clear_settings_cache: None
-    ) -> None:
+    def test_settings_cache_returns_same_instance(self, clear_settings_cache: None) -> None:
         """两次调用 settings_factory() 返回同一实例（lru_cache 验证）。"""
         os.environ.pop("APP_ENV", None)
         s1 = settings_factory()
@@ -85,6 +83,6 @@ class TestSettingsExport:
 
     def test_import_settings_type(self) -> None:
         """config 包应导出 Settings 类型。"""
-        from config import Settings as S
+        from config import Settings
 
-        assert S is not None
+        assert Settings is not None

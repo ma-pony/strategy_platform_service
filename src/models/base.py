@@ -13,7 +13,6 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 class Base(DeclarativeBase):
     """所有 SQLAlchemy 模型的基类。"""
 
-    pass
 
 
 class TimestampMixin:

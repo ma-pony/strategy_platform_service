@@ -57,7 +57,6 @@ def run_backtest_task(self: Any, strategy_id: int) -> None:  # type: ignore[misc
     # 延迟导入，避免循环引用
     from src.freqtrade_bridge.strategy_registry import lookup
     from src.models.backtest import BacktestResult, BacktestTask
-    from src.models.signal import TradingSignal
     from src.models.strategy import Strategy
 
     today = datetime.date.today()
@@ -129,7 +128,7 @@ def run_backtest_task(self: Any, strategy_id: int) -> None:  # type: ignore[misc
             session.add(task_record)
             session.flush()  # 获取 task_record.id
 
-        task_dir = Path("/tmp/freqtrade_jobs") / str(task_record.id)
+        task_dir = Path("/tmp/freqtrade_jobs") / str(task_record.id)  # noqa: S108
 
         try:
             # 4. 更新状态为 RUNNING
@@ -218,7 +217,7 @@ def run_backtest_task(self: Any, strategy_id: int) -> None:  # type: ignore[misc
                 "sharpe_ratio": result_data.get("sharpe_ratio"),
                 "trade_count": result_data.get("trade_count"),
             }
-            for _pair in (pairs if pairs else ["BTC/USDT"]):
+            for _pair in pairs if pairs else ["BTC/USDT"]:
                 _upsert_metrics_for_backtest(
                     session=session,
                     strategy_id=strategy_id,
@@ -255,7 +254,7 @@ def run_backtest_task(self: Any, strategy_id: int) -> None:  # type: ignore[misc
             task_record.error_message = str(exc)[:2000]
             session.commit()
 
-        except Exception as exc:
+        except Exception:
             duration_ms = int((time.monotonic() - start_time) * 1000)
             logger.error(
                 "unexpected error in backtest task",
@@ -382,7 +381,7 @@ def _insert_backtest_signals(
     from src.core.enums import SignalDirection
     from src.models.signal import TradingSignal
 
-    now = datetime.datetime.now(tz=datetime.timezone.utc)
+    datetime.datetime.now(tz=datetime.timezone.utc)
 
     for sig in signals:
         direction_str = sig.get("direction", "hold").lower()

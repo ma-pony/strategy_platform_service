@@ -12,6 +12,7 @@
 
 import datetime
 from pathlib import Path
+
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -56,12 +57,13 @@ class AdminBacktestService:
         lookup(strategy.name)  # 不存在则抛 UnsupportedStrategyError
 
         # 3. 预检临时目录可用性
-        tmp_base = Path("/tmp/freqtrade_jobs")
+        tmp_base = Path("/tmp/freqtrade_jobs")  # noqa: S108
         try:
-            tmp_base.mkdir(parents=True, exist_ok=True)
+            tmp_base.mkdir(parents=True, exist_ok=True)  # noqa: ASYNC240
         except OSError:
             from src.core.exceptions import FreqtradeError
-            raise FreqtradeError("临时目录不可用，请联系管理员")
+
+            raise FreqtradeError("临时目录不可用，请联系管理员") from None
 
         # 4. 创建 PENDING 任务
         task = BacktestTask(
@@ -75,6 +77,7 @@ class AdminBacktestService:
 
         # 5. 通过 Celery 异步入队
         from src.workers.celery_app import celery_app
+
         celery_app.send_task(
             "src.workers.tasks.backtest_tasks.run_backtest_task",
             args=[strategy_id],
@@ -150,12 +153,7 @@ class AdminBacktestService:
         total: int = count_result.scalar_one()
 
         # 分页数据
-        stmt = (
-            base_query
-            .order_by(BacktestTask.created_at.desc())
-            .limit(page_size)
-            .offset(offset)
-        )
+        stmt = base_query.order_by(BacktestTask.created_at.desc()).limit(page_size).offset(offset)
         result = await db.execute(stmt)
         tasks: list[BacktestTask] = list(result.scalars().all())
 

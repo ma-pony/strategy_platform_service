@@ -73,9 +73,7 @@ async def list_reports(
     返回摘要字段（id、title、summary、generated_at、related_coins），不含 content。
     默认 page_size=20，最大 100。
     """
-    reports, total = await _report_service.list_reports(
-        db, page=page, page_size=page_size
-    )
+    reports, total = await _report_service.list_reports(db, page=page, page_size=page_size)
 
     items: list[Any] = [_serialize_report_read(report) for report in reports]
 

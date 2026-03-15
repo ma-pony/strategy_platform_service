@@ -1,12 +1,10 @@
-import pandas as pd
 from datetime import datetime
-from pandas import DataFrame
-from typing import Optional
 
-from freqtrade.strategy import IStrategy, IntParameter, DecimalParameter, stoploss_from_open
-from freqtrade.persistence import Trade
-
+import pandas as pd
 import talib.abstract as ta
+from freqtrade.persistence import Trade
+from freqtrade.strategy import DecimalParameter, IntParameter, IStrategy, stoploss_from_open
+from pandas import DataFrame
 
 
 class AroonTrendSystemStrategy(IStrategy):
@@ -98,7 +96,9 @@ class AroonTrendSystemStrategy(IStrategy):
         dataframe.loc[((dataframe["aroon_down"] < thr) | cross_up) & vol_ok, "exit_short"] = 1
         return dataframe
 
-    def custom_stoploss(self, pair: str, trade: Trade, current_time: datetime, current_rate: float, current_profit: float, **kwargs) -> float:
+    def custom_stoploss(
+        self, pair: str, trade: Trade, current_time: datetime, current_rate: float, current_profit: float, **kwargs
+    ) -> float:
         try:
             dataframe, _ = self.dp.get_analyzed_dataframe(pair, self.timeframe)
             if dataframe is None or len(dataframe) < 20:
@@ -146,7 +146,9 @@ class AroonTrendSystemStrategy(IStrategy):
                     stop_price = float(current_rate) + float(trail_distance)
                     if stop_price > float(trade.open_rate):
                         stop_price = float(trade.open_rate)
-                    open_relative_stop = max(open_relative_stop, (float(trade.open_rate) - stop_price) / float(trade.open_rate))
+                    open_relative_stop = max(
+                        open_relative_stop, (float(trade.open_rate) - stop_price) / float(trade.open_rate)
+                    )
                 else:
                     stop_price = float(current_rate) - float(trail_distance)
                     if stop_price < float(trade.open_rate):
@@ -159,10 +161,12 @@ class AroonTrendSystemStrategy(IStrategy):
             return sl
         except Exception as e:
             if hasattr(self, "log"):
-                self.log.error(f"Custom stoploss error for {pair}: {str(e)}")
+                self.log.error(f"Custom stoploss error for {pair}: {e!s}")
             return 1.0
 
-    def custom_exit(self, pair: str, trade: Trade, current_time: datetime, current_rate: float, current_profit: float, **kwargs) -> Optional[str]:
+    def custom_exit(
+        self, pair: str, trade: Trade, current_time: datetime, current_rate: float, current_profit: float, **kwargs
+    ) -> str | None:
         if current_profit <= 0:
             return None
 
@@ -196,4 +200,3 @@ class AroonTrendSystemStrategy(IStrategy):
                 "Volume": {"volume": {"color": "gray", "type": "bar"}, "volume_mean": {"color": "blue"}},
             },
         }
-

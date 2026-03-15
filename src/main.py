@@ -30,9 +30,7 @@ class ApplicationRunner:
     def __init__(self) -> None:
         self._shutdown_event: bool = False
 
-    def _handle_signal(
-        self, signum: int, frame: types.FrameType | None
-    ) -> None:
+    def _handle_signal(self, signum: int, frame: types.FrameType | None) -> None:
         """设置关闭标志，触发优雅退出。"""
         self._shutdown_event = True
 

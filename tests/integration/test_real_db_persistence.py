@@ -18,7 +18,6 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-
 pytestmark = pytest.mark.integration_db
 
 
@@ -29,9 +28,7 @@ class TestBacktestPersistence:
     commit 后重新查询，断言六项核心指标值与写入值一致。
     """
 
-    async def test_backtest_task_and_result_persist_correctly(
-        self, real_db_session: AsyncSession
-    ) -> None:
+    async def test_backtest_task_and_result_persist_correctly(self, real_db_session: AsyncSession) -> None:
         """插入 BacktestTask + BacktestResult，commit 后重查，验证六项核心指标一致。
 
         六项核心指标：
@@ -131,9 +128,7 @@ class TestBacktestPersistence:
             f"win_rate 不匹配：期望 {expected_win_rate}，实际 {persisted.win_rate}"
         )
 
-    async def test_backtest_task_status_persists(
-        self, real_db_session: AsyncSession
-    ) -> None:
+    async def test_backtest_task_status_persists(self, real_db_session: AsyncSession) -> None:
         """验证 BacktestTask 状态流转后持久化正确。"""
         from src.core.enums import TaskStatus
         from src.models.backtest import BacktestTask
@@ -181,9 +176,7 @@ class TestUserMembershipPersistence:
     插入 User 对象后查询，验证 membership 字段正确持久化。
     """
 
-    async def test_user_with_free_membership_persists_correctly(
-        self, real_db_session: AsyncSession
-    ) -> None:
+    async def test_user_with_free_membership_persists_correctly(self, real_db_session: AsyncSession) -> None:
         """插入 FREE 等级用户，commit 后重查，验证 membership 字段正确持久化。"""
         from src.core.enums import MembershipTier
         from src.models.user import User
@@ -209,9 +202,7 @@ class TestUserMembershipPersistence:
         assert persisted_user.is_active is True
         assert persisted_user.is_admin is False
 
-    async def test_user_with_vip1_membership_persists_correctly(
-        self, real_db_session: AsyncSession
-    ) -> None:
+    async def test_user_with_vip1_membership_persists_correctly(self, real_db_session: AsyncSession) -> None:
         """插入 VIP1 等级用户，commit 后重查，验证 membership 字段正确持久化。"""
         from src.core.enums import MembershipTier
         from src.models.user import User
@@ -233,9 +224,7 @@ class TestUserMembershipPersistence:
         assert persisted_user is not None
         assert persisted_user.membership == MembershipTier.VIP1
 
-    async def test_user_with_vip2_membership_persists_correctly(
-        self, real_db_session: AsyncSession
-    ) -> None:
+    async def test_user_with_vip2_membership_persists_correctly(self, real_db_session: AsyncSession) -> None:
         """插入 VIP2 等级用户，commit 后重查，验证 membership 字段正确持久化。"""
         from src.core.enums import MembershipTier
         from src.models.user import User
@@ -257,9 +246,7 @@ class TestUserMembershipPersistence:
         assert persisted_user is not None
         assert persisted_user.membership == MembershipTier.VIP2
 
-    async def test_user_membership_upgrade_persists(
-        self, real_db_session: AsyncSession
-    ) -> None:
+    async def test_user_membership_upgrade_persists(self, real_db_session: AsyncSession) -> None:
         """验证用户会员等级从 FREE 升级到 VIP2 后，新等级正确持久化。"""
         from src.core.enums import MembershipTier
         from src.models.user import User

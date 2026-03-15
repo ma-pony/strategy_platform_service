@@ -10,7 +10,6 @@
 
 import importlib
 from pathlib import Path
-from typing import Optional
 
 import pytest
 from sqlalchemy import (
@@ -24,9 +23,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Session
 
-MIGRATIONS_DIR = (
-    Path(__file__).parent.parent.parent / "migrations" / "versions"
-)
+MIGRATIONS_DIR = Path(__file__).parent.parent.parent / "migrations" / "versions"
 
 PAIR_METRICS_MIGRATION_SLUG = "add_strategy_pair_metrics"
 
@@ -75,7 +72,6 @@ class TestDataSourceEnum:
 
     def test_datasource_naming_consistent_with_existing_enums(self) -> None:
         """DataSource 命名风格应与现有枚举（MembershipTier、TaskStatus）一致。"""
-        from src.core.enums import DataSource, MembershipTier, TaskStatus
 
         # 所有枚举都在同一模块中
         import src.core.enums as enums_module
@@ -267,13 +263,8 @@ class TestStrategyPairMetricsModel:
         from src.models.strategy_pair_metrics import StrategyPairMetrics
 
         table = StrategyPairMetrics.__table__
-        unique_constraints = [
-            c for c in table.constraints if isinstance(c, UniqueConstraint)
-        ]
-        col_sets = [
-            frozenset(col.name for col in uc.columns)
-            for uc in unique_constraints
-        ]
+        unique_constraints = [c for c in table.constraints if isinstance(c, UniqueConstraint)]
+        col_sets = [frozenset(col.name for col in uc.columns) for uc in unique_constraints]
         assert frozenset({"strategy_id", "pair", "timeframe"}) in col_sets
 
     def test_unique_constraint_named_correctly(self) -> None:
@@ -281,11 +272,7 @@ class TestStrategyPairMetricsModel:
         from src.models.strategy_pair_metrics import StrategyPairMetrics
 
         table = StrategyPairMetrics.__table__
-        unique_constraint_names = {
-            c.name
-            for c in table.constraints
-            if isinstance(c, UniqueConstraint)
-        }
+        unique_constraint_names = {c.name for c in table.constraints if isinstance(c, UniqueConstraint)}
         assert "uq_spm_strategy_pair_tf" in unique_constraint_names
 
     def test_has_idx_spm_strategy_id_index(self) -> None:
@@ -317,7 +304,6 @@ class TestStrategyPairMetricsModel:
         from sqlalchemy import Enum as SAEnum
         from sqlalchemy.orm import class_mapper
 
-        from src.core.enums import DataSource
         from src.models.strategy_pair_metrics import StrategyPairMetrics
 
         mapper = class_mapper(StrategyPairMetrics)
@@ -366,7 +352,6 @@ class TestStrategyPairMetricsModel:
     def test_model_registered_in_base_metadata(self) -> None:
         """strategy_pair_metrics 表应注册到 Base.metadata（供 Alembic 检测）。"""
         import src.models.strategy_pair_metrics  # noqa: F401
-
         from src.models.base import Base
 
         assert "strategy_pair_metrics" in Base.metadata.tables
@@ -377,13 +362,12 @@ class TestStrategyPairMetricsInMemoryDB:
 
     def test_table_can_be_created_in_sqlite(self) -> None:
         """SQLite 内存数据库中应能成功创建 strategy_pair_metrics 表。"""
-        import src.models.backtest  # noqa: F401
-        import src.models.report  # noqa: F401
-        import src.models.signal  # noqa: F401
-        import src.models.strategy  # noqa: F401
-        import src.models.strategy_pair_metrics  # noqa: F401
+        import src.models.backtest
+        import src.models.report
+        import src.models.signal
+        import src.models.strategy
+        import src.models.strategy_pair_metrics
         import src.models.user  # noqa: F401
-
         from src.models.base import Base
 
         engine = create_engine("sqlite:///:memory:")
@@ -396,12 +380,11 @@ class TestStrategyPairMetricsInMemoryDB:
         """策略对绩效指标记录应可写入并读回（需求 1.5：首次写入自动创建）。"""
         from datetime import datetime, timezone
 
-        import src.models.backtest  # noqa: F401
-        import src.models.report  # noqa: F401
-        import src.models.signal  # noqa: F401
-        import src.models.strategy_pair_metrics  # noqa: F401
+        import src.models.backtest
+        import src.models.report
+        import src.models.signal
+        import src.models.strategy_pair_metrics
         import src.models.user  # noqa: F401
-
         from src.core.enums import DataSource
         from src.models.base import Base
         from src.models.strategy import Strategy
@@ -450,13 +433,13 @@ class TestStrategyPairMetricsInMemoryDB:
         """(strategy_id, pair, timeframe) 唯一约束应阻止重复记录（需求 1.2）。"""
         from datetime import datetime, timezone
 
-        import src.models.backtest  # noqa: F401
-        import src.models.report  # noqa: F401
-        import src.models.signal  # noqa: F401
-        import src.models.strategy_pair_metrics  # noqa: F401
-        import src.models.user  # noqa: F401
         from sqlalchemy.exc import IntegrityError
 
+        import src.models.backtest
+        import src.models.report
+        import src.models.signal
+        import src.models.strategy_pair_metrics
+        import src.models.user  # noqa: F401
         from src.core.enums import DataSource
         from src.models.base import Base
         from src.models.strategy import Strategy
@@ -507,9 +490,7 @@ class TestStrategyPairMetricsInMemoryDB:
 def _load_pair_metrics_migration():
     """加载 add_strategy_pair_metrics 迁移模块。"""
     files = list(MIGRATIONS_DIR.glob(f"*{PAIR_METRICS_MIGRATION_SLUG}.py"))
-    assert len(files) == 1, (
-        f"找不到包含 '{PAIR_METRICS_MIGRATION_SLUG}' 的迁移文件"
-    )
+    assert len(files) == 1, f"找不到包含 '{PAIR_METRICS_MIGRATION_SLUG}' 的迁移文件"
     module_name = f"migrations.versions.{files[0].stem}"
     return importlib.import_module(module_name)
 
@@ -520,9 +501,7 @@ class TestStrategyPairMetricsMigration:
     def test_migration_file_exists(self) -> None:
         """add_strategy_pair_metrics 迁移文件应存在。"""
         files = list(MIGRATIONS_DIR.glob(f"*{PAIR_METRICS_MIGRATION_SLUG}.py"))
-        assert len(files) == 1, (
-            f"缺少包含 '{PAIR_METRICS_MIGRATION_SLUG}' 的迁移文件"
-        )
+        assert len(files) == 1, f"缺少包含 '{PAIR_METRICS_MIGRATION_SLUG}' 的迁移文件"
 
     def test_migration_has_upgrade_function(self) -> None:
         """迁移文件应有 upgrade() 函数。"""
@@ -627,7 +606,6 @@ class TestStrategyPairMetricsInModelsInit:
     def test_strategy_pair_metrics_table_in_metadata(self) -> None:
         """导入 src.models 后，strategy_pair_metrics 表应注册到 Base.metadata。"""
         import src.models  # noqa: F401
-
         from src.models.base import Base
 
         assert "strategy_pair_metrics" in Base.metadata.tables

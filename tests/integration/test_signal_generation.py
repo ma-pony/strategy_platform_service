@@ -30,6 +30,7 @@ def env_setup(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("REDIS_URL", "redis://localhost:6379/0")
 
     from src.core import app_settings
+
     app_settings.get_settings.cache_clear()
     yield
     app_settings.get_settings.cache_clear()
@@ -119,8 +120,7 @@ class TestSignalGenerationRealtimeSource:
         assert len(signal_records) >= 1, "应至少插入 1 条信号记录"
 
         for signal in signal_records:
-            assert signal.signal_source == "realtime", \
-                f"signal_source 应为 'realtime'，实际为 {signal.signal_source!r}"
+            assert signal.signal_source == "realtime", f"signal_source 应为 'realtime'，实际为 {signal.signal_source!r}"
 
     def test_all_11_extension_fields_correctly_inserted(self, env_setup) -> None:
         """全部 11 个扩展信号字段应正确写入数据库。"""
@@ -285,7 +285,6 @@ class TestTradingSignalsAppendOnly:
 
     def test_only_add_and_commit_called(self, env_setup) -> None:
         """信号持久化时只调用 session.add() 和 session.commit()，不调用 delete。"""
-        from src.models.signal import TradingSignal
         from src.workers.tasks.signal_tasks import generate_signals_task
 
         mock_session = _make_mock_session()
@@ -335,8 +334,7 @@ class TestTradingSignalsAppendOnly:
                     count_after_second = len([r for r in all_added_records if isinstance(r, TradingSignal)])
 
         # 第二次调用应添加更多记录（累积），不应删除已有记录
-        assert count_after_second > count_after_first, \
-            "多次调用应累积记录，count 应递增"
+        assert count_after_second > count_after_first, "多次调用应累积记录，count 应递增"
 
 
 class TestSignalQueryOrder:
@@ -345,24 +343,22 @@ class TestSignalQueryOrder:
     @pytest.fixture()
     def app(self, env_setup):
         from src.api.main_router import create_app
+
         return create_app()
 
     @pytest.fixture()
     def authed_app(self, app):
         """带认证的 app（注入普通用户）。"""
         from src.core.deps import get_current_user
-        user = SimpleNamespace(
-            id=1, email="testuser@example.com", membership="vip1", is_active=True, is_admin=False
-        )
+
+        user = SimpleNamespace(id=1, email="testuser@example.com", membership="vip1", is_active=True, is_admin=False)
         app.dependency_overrides[get_current_user] = lambda: user
         yield app
         app.dependency_overrides.clear()
 
     @pytest.fixture()
     async def authed_client(self, authed_app) -> AsyncGenerator[AsyncClient, None]:
-        async with AsyncClient(
-            transport=ASGITransport(app=authed_app), base_url="http://test"
-        ) as ac:
+        async with AsyncClient(transport=ASGITransport(app=authed_app), base_url="http://test") as ac:
             yield ac
 
     def _make_signal_obj(
@@ -410,7 +406,7 @@ class TestSignalQueryOrder:
 
         # 按 signal_at 降序排列（SignalService._get_signals_from_db 使用 signal_at.desc()）
         sorted_signals = [signal_latest, signal_newer, signal_older]
-        mock_strategy = SimpleNamespace(id=1, name="TurtleTradingStrategy")
+        SimpleNamespace(id=1, name="TurtleTradingStrategy")
 
         with patch(
             "src.services.signal_service.SignalService.get_signals",
@@ -449,7 +445,7 @@ class TestSignalQueryOrder:
         mock_db.execute.side_effect = [strategy_exec_result, signal_exec_result]
 
         service = SignalService()
-        signals, last_updated_at = await service.get_signals(mock_db, strategy_id=1)
+        _signals, _last_updated_at = await service.get_signals(mock_db, strategy_id=1)
 
         # 验证执行了两次查询
         assert mock_db.execute.call_count == 2
@@ -469,6 +465,7 @@ class TestSignalFetcherShortSignalsIntegration:
     def _run_fetcher_with_df(self, df):
         """用指定 df 运行 _fetch_signals_sync 并返回信号。"""
         from pathlib import Path
+
         from src.freqtrade_bridge.signal_fetcher import _fetch_signals_sync
 
         entry = {"class_name": "MockStrategy", "file_path": Path("/fake")}
@@ -480,15 +477,21 @@ class TestSignalFetcherShortSignalsIntegration:
 
     def _make_df(self, n=50, **last_row_overrides):
         import numpy as np
+
         rng = np.random.default_rng(42)
         import pandas as pd
+
         closes = 30000.0 + rng.uniform(-500, 500, n).cumsum()
-        df = pd.DataFrame({
-            "date": pd.date_range("2025-01-01", periods=n, freq="1h"),
-            "open": closes * 0.999, "high": closes * 1.005,
-            "low": closes * 0.995, "close": closes,
-            "volume": rng.uniform(100, 1000, n),
-        })
+        df = pd.DataFrame(
+            {
+                "date": pd.date_range("2025-01-01", periods=n, freq="1h"),
+                "open": closes * 0.999,
+                "high": closes * 1.005,
+                "low": closes * 0.995,
+                "close": closes,
+                "volume": rng.uniform(100, 1000, n),
+            }
+        )
         df["atr"] = 100.0
         df["volume_mean"] = 500.0
         df["enter_long"] = 0
@@ -551,7 +554,7 @@ class TestSignalFetcherShortSignalsIntegration:
 
     def test_sell_fallback_sl_tp_without_atr(self) -> None:
         """sell 方向无 ATR 时 SL=entry*1.03, TP=entry*0.95。"""
-        import math
+
         df = self._make_df(enter_short=1, atr=float("nan"))
         sig = self._run_fetcher_with_df(df)["signals"][0]
         assert sig["stop_loss"] > sig["entry_price"]
@@ -564,32 +567,87 @@ class TestBacktesterSignalsIntegration:
     def test_confidence_not_based_on_profit(self) -> None:
         """不论利润大小，confidence 一致。"""
         from src.freqtrade_bridge.backtester import _trades_to_signals
-        big_profit = _trades_to_signals([{"pair": "BTC/USDT", "is_short": False,
-            "profit_ratio": 0.50, "open_rate": 30000, "close_rate": 45000,
-            "stop_loss_abs": 28000, "stake_amount": 500, "open_date": "2025-01-01",
-            "exit_reason": "roi", "trade_duration": 100, "profit_abs": 500}])
-        big_loss = _trades_to_signals([{"pair": "BTC/USDT", "is_short": False,
-            "profit_ratio": -0.50, "open_rate": 30000, "close_rate": 15000,
-            "stop_loss_abs": 28000, "stake_amount": 500, "open_date": "2025-01-01",
-            "exit_reason": "stop_loss", "trade_duration": 50, "profit_abs": -500}])
+
+        big_profit = _trades_to_signals(
+            [
+                {
+                    "pair": "BTC/USDT",
+                    "is_short": False,
+                    "profit_ratio": 0.50,
+                    "open_rate": 30000,
+                    "close_rate": 45000,
+                    "stop_loss_abs": 28000,
+                    "stake_amount": 500,
+                    "open_date": "2025-01-01",
+                    "exit_reason": "roi",
+                    "trade_duration": 100,
+                    "profit_abs": 500,
+                }
+            ]
+        )
+        big_loss = _trades_to_signals(
+            [
+                {
+                    "pair": "BTC/USDT",
+                    "is_short": False,
+                    "profit_ratio": -0.50,
+                    "open_rate": 30000,
+                    "close_rate": 15000,
+                    "stop_loss_abs": 28000,
+                    "stake_amount": 500,
+                    "open_date": "2025-01-01",
+                    "exit_reason": "stop_loss",
+                    "trade_duration": 50,
+                    "profit_abs": -500,
+                }
+            ]
+        )
         assert big_profit[0]["confidence_score"] == big_loss[0]["confidence_score"]
 
     def test_signal_strength_not_negative(self) -> None:
         """signal_strength 不应为负数（之前直接用 profit_ratio 会负）。"""
         from src.freqtrade_bridge.backtester import _trades_to_signals
-        result = _trades_to_signals([{"pair": "BTC/USDT", "is_short": False,
-            "profit_ratio": -0.15, "open_rate": 30000, "close_rate": 25500,
-            "stop_loss_abs": 28000, "stake_amount": 500, "open_date": "2025-01-01",
-            "exit_reason": "stop_loss", "trade_duration": 60, "profit_abs": -75}])
+
+        result = _trades_to_signals(
+            [
+                {
+                    "pair": "BTC/USDT",
+                    "is_short": False,
+                    "profit_ratio": -0.15,
+                    "open_rate": 30000,
+                    "close_rate": 25500,
+                    "stop_loss_abs": 28000,
+                    "stake_amount": 500,
+                    "open_date": "2025-01-01",
+                    "exit_reason": "stop_loss",
+                    "trade_duration": 60,
+                    "profit_abs": -75,
+                }
+            ]
+        )
         assert result[0]["signal_strength"] >= 0
 
     def test_indicator_values_no_profit_abs(self) -> None:
         """indicator_values 不含 profit_abs（避免暴露事后数据）。"""
         from src.freqtrade_bridge.backtester import _trades_to_signals
-        result = _trades_to_signals([{"pair": "BTC/USDT", "is_short": False,
-            "profit_ratio": 0.05, "open_rate": 30000, "close_rate": 31500,
-            "stop_loss_abs": 28000, "stake_amount": 500, "open_date": "2025-01-01",
-            "exit_reason": "roi", "trade_duration": 120, "profit_abs": 25}])
+
+        result = _trades_to_signals(
+            [
+                {
+                    "pair": "BTC/USDT",
+                    "is_short": False,
+                    "profit_ratio": 0.05,
+                    "open_rate": 30000,
+                    "close_rate": 31500,
+                    "stop_loss_abs": 28000,
+                    "stake_amount": 500,
+                    "open_date": "2025-01-01",
+                    "exit_reason": "roi",
+                    "trade_duration": 120,
+                    "profit_abs": 25,
+                }
+            ]
+        )
         assert "profit_abs" not in result[0]["indicator_values"]
 
 
@@ -622,6 +680,7 @@ class TestSignalRedisCachePerformance:
 
         # 使用 AsyncMock 模拟 DB session（不应被调用，缓存命中时不查询 DB）
         from unittest.mock import AsyncMock
+
         from sqlalchemy.ext.asyncio import AsyncSession
 
         mock_db = AsyncMock(spec=AsyncSession)
@@ -636,7 +695,7 @@ class TestSignalRedisCachePerformance:
         async def measure_cache_hit():
             with patch("src.services.signal_service.get_redis_client", return_value=mock_redis):
                 start = time.perf_counter()
-                signals, last_updated_at = await service.get_signals(mock_db, strategy_id=1)
+                signals, _last_updated_at = await service.get_signals(mock_db, strategy_id=1)
                 elapsed_ms = (time.perf_counter() - start) * 1000
             return signals, elapsed_ms
 
@@ -647,7 +706,6 @@ class TestSignalRedisCachePerformance:
 
     def test_redis_cache_key_format(self, env_setup) -> None:
         """Redis 缓存 key 格式应为 signal:{strategy_id}。"""
-        from src.models.signal import TradingSignal
         from src.workers.tasks.signal_tasks import generate_signals_task
 
         mock_session = _make_mock_session()
@@ -707,28 +765,12 @@ class TestSignalRedisCachePerformance:
         from src.core.deps import get_current_user
 
         app = create_app()
-        user = SimpleNamespace(
-            id=1, email="testuser@example.com", membership="vip1", is_active=True, is_admin=False
-        )
+        user = SimpleNamespace(id=1, email="testuser@example.com", membership="vip1", is_active=True, is_admin=False)
         app.dependency_overrides[get_current_user] = lambda: user
 
         # 模拟缓存数据
-        cached_data = {
-            "signals": [
-                {
-                    "id": 1,
-                    "strategy_id": 1,
-                    "pair": "BTC/USDT",
-                    "direction": "buy",
-                    "confidence_score": 0.8,
-                    "signal_at": "2024-03-15T10:00:00+00:00",
-                    "created_at": "2024-03-15T10:00:00+00:00",
-                }
-            ],
-            "last_updated_at": "2024-03-15T10:00:00+00:00",
-        }
 
-        mock_strategy = SimpleNamespace(id=1, name="TurtleTradingStrategy")
+        SimpleNamespace(id=1, name="TurtleTradingStrategy")
         mock_signals = [
             SimpleNamespace(
                 id=1,
@@ -755,9 +797,7 @@ class TestSignalRedisCachePerformance:
             new_callable=AsyncMock,
             return_value=(mock_signals, datetime.datetime.now(tz=datetime.timezone.utc)),
         ):
-            async with AsyncClient(
-                transport=ASGITransport(app=app), base_url="http://test"
-            ) as ac:
+            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
                 start = time.perf_counter()
                 resp = await ac.get("/api/v1/strategies/1/signals")
                 elapsed_ms = (time.perf_counter() - start) * 1000

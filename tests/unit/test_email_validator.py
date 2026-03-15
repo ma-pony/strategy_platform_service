@@ -97,12 +97,10 @@ class TestEmailValidatorFallback:
         # 通过 patch 使 email_validator 模块不可用来测试降级逻辑
         with patch.dict(sys.modules, {"email_validator": None}):
             # 重新导入模块以触发降级检测
-            import importlib
 
             import src.utils.email_validator as ev_module
 
             original_available = ev_module._EMAIL_VALIDATOR_AVAILABLE
-            original_validate_fn = ev_module.EmailValidator.validate
 
             # 强制切换到降级模式
             ev_module._EMAIL_VALIDATOR_AVAILABLE = False

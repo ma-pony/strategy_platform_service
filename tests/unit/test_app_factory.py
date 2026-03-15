@@ -131,9 +131,7 @@ class TestFastAPIAppEndpoints:
         from src.api.main_router import create_app
 
         app = create_app()
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as ac:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
             response = await ac.get("/api/v1/nonexistent")
         assert response.status_code == 404
 
@@ -155,9 +153,7 @@ class TestFastAPIAppEndpoints:
 
         app.dependency_overrides[get_db] = override_get_db
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as ac:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
             # 缺少必填字段，触发 422
             response = await ac.post(
                 "/api/v1/auth/register",
@@ -178,7 +174,6 @@ class TestFastAPIAppEndpoints:
 
         from src.api.main_router import create_app
         from src.core.deps import get_db
-        from src.core.exceptions import LoginNotFoundError
 
         app = create_app()
         mock_db = AsyncMock()
@@ -191,9 +186,7 @@ class TestFastAPIAppEndpoints:
 
         app.dependency_overrides[get_db] = override_get_db
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as ac:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
             # 使用不存在的邮箱登录触发 LoginNotFoundError
             response = await ac.post(
                 "/api/v1/auth/login",

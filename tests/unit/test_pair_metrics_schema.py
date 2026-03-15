@@ -10,8 +10,6 @@
 
 from datetime import datetime, timezone
 
-import pytest
-
 from src.core.enums import DataSource, MembershipTier
 
 

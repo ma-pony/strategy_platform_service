@@ -11,8 +11,7 @@
   - generate_signals_task 失败时记录警告日志，不影响缓存数据
 """
 
-from datetime import date
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -26,6 +25,7 @@ def env_setup(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("REDIS_URL", "redis://localhost:6379/0")
 
     from src.core import app_settings
+
     app_settings.get_settings.cache_clear()
     yield
     app_settings.get_settings.cache_clear()
@@ -37,54 +37,55 @@ class TestCeleryAppInit:
     def test_celery_app_can_be_imported(self, env_setup) -> None:
         """Celery 应用模块可以被导入。"""
         from src.workers.celery_app import celery_app
+
         assert celery_app is not None
 
     def test_celery_app_has_correct_broker_config(self, env_setup) -> None:
         """Celery 以 Redis 作为 broker。"""
         from src.workers.celery_app import celery_app
+
         # broker_url 应包含 redis
         assert "redis" in celery_app.conf.broker_url.lower()
 
     def test_celery_app_has_correct_backend_config(self, env_setup) -> None:
         """Celery 以 Redis 作为 result backend。"""
         from src.workers.celery_app import celery_app
+
         assert celery_app.conf.result_backend is not None
         assert "redis" in celery_app.conf.result_backend.lower()
 
     def test_celery_app_has_backtest_queue(self, env_setup) -> None:
         """Celery 配置了 backtest 队列。"""
         from src.workers.celery_app import celery_app
+
         queue_names = [q.name for q in celery_app.conf.task_queues]
         assert "backtest" in queue_names
 
     def test_celery_app_has_signal_queue(self, env_setup) -> None:
         """Celery 配置了 signal 队列。"""
         from src.workers.celery_app import celery_app
+
         queue_names = [q.name for q in celery_app.conf.task_queues]
         assert "signal" in queue_names
 
     def test_celery_beat_schedule_contains_backtest_task(self, env_setup) -> None:
         """Celery Beat 定时计划包含回测任务（每日 02:00 UTC）。"""
         from src.workers.celery_app import celery_app
+
         schedule = celery_app.conf.beat_schedule
         assert schedule is not None
         # 至少有一个包含回测相关的任务
         schedule_names = list(schedule.keys())
-        backtest_schedules = [
-            name for name in schedule_names
-            if "backtest" in name.lower()
-        ]
+        backtest_schedules = [name for name in schedule_names if "backtest" in name.lower()]
         assert len(backtest_schedules) >= 1
 
     def test_celery_beat_schedule_contains_signal_task(self, env_setup) -> None:
         """Celery Beat 定时计划包含信号生成任务（每 15 分钟）。"""
         from src.workers.celery_app import celery_app
+
         schedule = celery_app.conf.beat_schedule
         schedule_names = list(schedule.keys())
-        signal_schedules = [
-            name for name in schedule_names
-            if "signal" in name.lower()
-        ]
+        signal_schedules = [name for name in schedule_names if "signal" in name.lower()]
         assert len(signal_schedules) >= 1
 
 
@@ -94,11 +95,13 @@ class TestRunBacktestTask:
     def test_task_has_acks_late_true(self, env_setup) -> None:
         """run_backtest_task 配置 acks_late=True。"""
         from src.workers.tasks.backtest_tasks import run_backtest_task
+
         assert run_backtest_task.acks_late is True
 
     def test_task_has_max_retries_3(self, env_setup) -> None:
         """run_backtest_task 配置 max_retries=3。"""
         from src.workers.tasks.backtest_tasks import run_backtest_task
+
         assert run_backtest_task.max_retries == 3
 
     def test_task_skips_when_today_done_exists(self, env_setup) -> None:
@@ -149,7 +152,6 @@ class TestRunBacktestTask:
 
     def test_task_creates_backtest_result_on_success(self, env_setup) -> None:
         """任务成功时创建 BacktestResult 并更新 Task 为 DONE。"""
-        from src.core.enums import TaskStatus
         from src.workers.tasks.backtest_tasks import run_backtest_task
 
         mock_session = MagicMock()
@@ -213,7 +215,6 @@ class TestRunBacktestTask:
     def test_task_marks_failed_on_execution_error(self, env_setup) -> None:
         """FreqtradeExecutionError 时更新 Task 为 FAILED。"""
         from src.freqtrade_bridge.exceptions import FreqtradeExecutionError
-        from src.core.enums import TaskStatus
         from src.workers.tasks.backtest_tasks import run_backtest_task
 
         mock_session = MagicMock()
@@ -356,9 +357,7 @@ class TestGenerateSignalsTask:
                     key_arg = call_args[0][0] if call_args[0] else call_args.kwargs.get("name", "")
                     assert "signal:1" in str(key_arg)
                     # 验证 TTL 为 3600
-                    assert call_args.kwargs.get("ex") == 3600 or (
-                        len(call_args[0]) > 2 and call_args[0][2] == 3600
-                    )
+                    assert call_args.kwargs.get("ex") == 3600 or (len(call_args[0]) > 2 and call_args[0][2] == 3600)
 
     def test_task_persists_signal_to_db(self, env_setup) -> None:
         """信号生成成功时，持久化新的 TradingSignal 至数据库。"""

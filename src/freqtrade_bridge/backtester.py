@@ -76,7 +76,7 @@ def run_backtest_subprocess(
         cmd.extend(["--strategy-path", strategy_path])
 
     try:
-        result = subprocess.run(
+        result = subprocess.run(  # noqa: S603
             cmd,
             capture_output=True,
             text=True,
@@ -88,9 +88,7 @@ def run_backtest_subprocess(
             strategy=strategy,
             timeout=timeout,
         )
-        raise FreqtradeTimeoutError(
-            f"回测任务超时（>{timeout}s），策略: {strategy}"
-        ) from exc
+        raise FreqtradeTimeoutError(f"回测任务超时（>{timeout}s），策略: {strategy}") from exc
 
     if result.returncode != 0:
         logger.error(
@@ -99,9 +97,7 @@ def run_backtest_subprocess(
             returncode=result.returncode,
             stderr=result.stderr[:2000],
         )
-        raise FreqtradeExecutionError(
-            f"回测执行失败，策略: {strategy}，退出码: {result.returncode}"
-        )
+        raise FreqtradeExecutionError(f"回测执行失败，策略: {strategy}，退出码: {result.returncode}")
 
     # freqtrade 将结果写入文件，从结果文件中读取
     return _parse_backtest_result(results_dir, strategy)
@@ -165,23 +161,25 @@ def _trades_to_signals(trades: list[dict[str, Any]]) -> list[dict[str, Any]]:
         # 无法获取 K 线级指标，使用可用的 trade 元数据
         confidence_score = 0.60  # 回测入场信号基础置信度
 
-        signals.append({
-            "pair": trade.get("pair", "BTC/USDT"),
-            "direction": direction,
-            "confidence_score": confidence_score,
-            "entry_price": trade.get("open_rate"),
-            "stop_loss": trade.get("stop_loss_abs"),
-            "take_profit": trade.get("close_rate"),
-            "timeframe": None,
-            "signal_strength": signal_strength,
-            "volume": trade.get("stake_amount"),
-            "volatility": None,
-            "indicator_values": {
-                "exit_reason": trade.get("exit_reason", ""),
-                "trade_duration": trade.get("trade_duration", 0),
-            },
-            "signal_at": trade.get("open_date", ""),
-        })
+        signals.append(
+            {
+                "pair": trade.get("pair", "BTC/USDT"),
+                "direction": direction,
+                "confidence_score": confidence_score,
+                "entry_price": trade.get("open_rate"),
+                "stop_loss": trade.get("stop_loss_abs"),
+                "take_profit": trade.get("close_rate"),
+                "timeframe": None,
+                "signal_strength": signal_strength,
+                "volume": trade.get("stake_amount"),
+                "volatility": None,
+                "indicator_values": {
+                    "exit_reason": trade.get("exit_reason", ""),
+                    "trade_duration": trade.get("trade_duration", 0),
+                },
+                "signal_at": trade.get("open_date", ""),
+            }
+        )
     return signals
 
 

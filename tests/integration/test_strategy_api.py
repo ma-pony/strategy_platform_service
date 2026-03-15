@@ -43,9 +43,7 @@ def app(env_setup):
 @pytest.fixture()
 async def client(app) -> AsyncGenerator[AsyncClient, None]:
     """提供绑定测试应用的异步 HTTP 客户端。"""
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as ac:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         yield ac
 
 
@@ -81,9 +79,7 @@ class TestStrategiesListEndpoint:
     """GET /api/v1/strategies 列表接口测试。"""
 
     @pytest.mark.asyncio
-    async def test_anonymous_can_access_strategies_list(
-        self, client: AsyncClient, app
-    ) -> None:
+    async def test_anonymous_can_access_strategies_list(self, client: AsyncClient, app) -> None:
         """匿名用户可以访问策略列表（无需 Authorization header）。"""
         from src.core.deps import get_db
 
@@ -111,9 +107,7 @@ class TestStrategiesListEndpoint:
         assert "total" in body["data"]
 
     @pytest.mark.asyncio
-    async def test_strategies_list_returns_paginated_response(
-        self, client: AsyncClient, app
-    ) -> None:
+    async def test_strategies_list_returns_paginated_response(self, client: AsyncClient, app) -> None:
         """列表接口返回分页结构。"""
         from src.core.deps import get_db
 
@@ -144,9 +138,7 @@ class TestStrategiesListEndpoint:
         assert len(data["items"]) == 3
 
     @pytest.mark.asyncio
-    async def test_strategy_list_item_anonymous_sees_base_fields(
-        self, client: AsyncClient, app
-    ) -> None:
+    async def test_strategy_list_item_anonymous_sees_base_fields(self, client: AsyncClient, app) -> None:
         """匿名用户访问策略列表时，item 仅含基础字段（无 sharpe_ratio 等 VIP 字段）。"""
         from src.core.deps import get_db
 
@@ -179,9 +171,7 @@ class TestStrategyDetailEndpoint:
     """GET /api/v1/strategies/{id} 详情接口测试。"""
 
     @pytest.mark.asyncio
-    async def test_strategy_not_found_returns_404_with_code_3001(
-        self, client: AsyncClient, app
-    ) -> None:
+    async def test_strategy_not_found_returns_404_with_code_3001(self, client: AsyncClient, app) -> None:
         """策略不存在时返回 HTTP 404，code=3001。"""
         from src.core.deps import get_db
         from src.core.exceptions import NotFoundError
@@ -207,9 +197,7 @@ class TestStrategyDetailEndpoint:
         assert body["code"] == 3001
 
     @pytest.mark.asyncio
-    async def test_anonymous_gets_base_fields_only(
-        self, client: AsyncClient, app
-    ) -> None:
+    async def test_anonymous_gets_base_fields_only(self, client: AsyncClient, app) -> None:
         """匿名用户访问策略详情，仅返回基础字段（sharpe_ratio、win_rate 为 null）。"""
         from src.core.deps import get_db
 
@@ -239,9 +227,7 @@ class TestStrategyDetailEndpoint:
         assert item.get("trade_count") is None
 
     @pytest.mark.asyncio
-    async def test_free_user_sees_free_tier_fields_not_vip(
-        self, client: AsyncClient, app
-    ) -> None:
+    async def test_free_user_sees_free_tier_fields_not_vip(self, client: AsyncClient, app) -> None:
         """Free 用户访问策略详情：Free 字段可见，VIP 字段不可见。"""
         from src.core.deps import get_db, get_optional_user
         from src.core.enums import MembershipTier
@@ -286,9 +272,7 @@ class TestStrategyDetailEndpoint:
         assert item.get("win_rate") is None
 
     @pytest.mark.asyncio
-    async def test_page_size_over_limit_returns_422_code_2001(
-        self, client: AsyncClient, app
-    ) -> None:
+    async def test_page_size_over_limit_returns_422_code_2001(self, client: AsyncClient, app) -> None:
         """传入 page_size=200（超过最大值 100）时，验证 HTTP 422 + code:2001（需求 2.5）。
 
         行为为返回校验错误，而非静默截断至最大值 100。
@@ -311,9 +295,7 @@ class TestStrategyDetailEndpoint:
         assert body["code"] == 2001
 
     @pytest.mark.asyncio
-    async def test_vip_user_sees_all_fields(
-        self, client: AsyncClient, app
-    ) -> None:
+    async def test_vip_user_sees_all_fields(self, client: AsyncClient, app) -> None:
         """VIP 用户访问策略详情，所有字段均可见。"""
         from src.core.deps import get_db, get_optional_user
         from src.core.enums import MembershipTier
@@ -356,9 +338,7 @@ class TestStrategyDetailEndpoint:
         assert item["max_drawdown"] == pytest.approx(0.12)
 
     @pytest.mark.asyncio
-    async def test_vip2_user_sees_all_advanced_fields(
-        self, client: AsyncClient, app
-    ) -> None:
+    async def test_vip2_user_sees_all_advanced_fields(self, client: AsyncClient, app) -> None:
         """VIP2 用户访问策略详情，所有高级指标字段均可见（需求 2.3）。"""
         from src.core.deps import get_db, get_optional_user
         from src.core.enums import MembershipTier
@@ -405,9 +385,7 @@ class TestStrategyListFieldVisibility:
     """GET /api/v1/strategies 列表接口字段可见性补充测试（审计批次 1）。"""
 
     @pytest.mark.asyncio
-    async def test_free_user_sees_free_fields_not_vip_in_list(
-        self, client: AsyncClient, app
-    ) -> None:
+    async def test_free_user_sees_free_fields_not_vip_in_list(self, client: AsyncClient, app) -> None:
         """Free 用户访问策略列表：trade_count / max_drawdown 可见，sharpe_ratio / win_rate 为 null。"""
         from src.core.deps import get_db, get_optional_user
         from src.core.enums import MembershipTier
@@ -449,9 +427,7 @@ class TestStrategyListFieldVisibility:
         assert item.get("win_rate") is None
 
     @pytest.mark.asyncio
-    async def test_vip1_user_sees_all_fields_in_list(
-        self, client: AsyncClient, app
-    ) -> None:
+    async def test_vip1_user_sees_all_fields_in_list(self, client: AsyncClient, app) -> None:
         """VIP1 用户访问策略列表：所有字段均可见。"""
         from src.core.deps import get_db, get_optional_user
         from src.core.enums import MembershipTier
@@ -497,9 +473,7 @@ class TestStrategyListPaginationValidation:
     """GET /api/v1/strategies 分页参数边界校验补充测试（审计批次 1）。"""
 
     @pytest.mark.asyncio
-    async def test_page_zero_returns_422_code_2001(
-        self, client: AsyncClient, app
-    ) -> None:
+    async def test_page_zero_returns_422_code_2001(self, client: AsyncClient, app) -> None:
         """page=0 时返回 HTTP 422 + code:2001（页码最小值为 1）。"""
         from src.core.deps import get_db
 
@@ -519,9 +493,7 @@ class TestStrategyListPaginationValidation:
         assert body["code"] == 2001
 
     @pytest.mark.asyncio
-    async def test_page_size_zero_returns_422_code_2001(
-        self, client: AsyncClient, app
-    ) -> None:
+    async def test_page_size_zero_returns_422_code_2001(self, client: AsyncClient, app) -> None:
         """page_size=0 时返回 HTTP 422 + code:2001（每页条数最小值为 1）。"""
         from src.core.deps import get_db
 
@@ -545,9 +517,7 @@ class TestStrategyListSoftAuth:
     """GET /api/v1/strategies 软鉴权场景补充测试（审计批次 1）。"""
 
     @pytest.mark.asyncio
-    async def test_invalid_token_treated_as_anonymous_returns_200(
-        self, client: AsyncClient, app
-    ) -> None:
+    async def test_invalid_token_treated_as_anonymous_returns_200(self, client: AsyncClient, app) -> None:
         """携带签名无效 token 时，接口静默降级为匿名访问，返回 HTTP 200 + 基础字段。"""
         from src.core.deps import get_db
 
@@ -580,9 +550,7 @@ class TestStrategyDetailSoftAuth:
     """GET /api/v1/strategies/{id} 软鉴权及路径参数校验补充测试（审计批次 1）。"""
 
     @pytest.mark.asyncio
-    async def test_non_integer_path_param_returns_422(
-        self, client: AsyncClient, app
-    ) -> None:
+    async def test_non_integer_path_param_returns_422(self, client: AsyncClient, app) -> None:
         """非整数路径参数 /strategies/abc 返回 HTTP 422，不应触发 500。"""
         from src.core.deps import get_db
 
@@ -600,9 +568,7 @@ class TestStrategyDetailSoftAuth:
         assert response.status_code == 422
 
     @pytest.mark.asyncio
-    async def test_bad_token_silently_treated_as_anonymous_in_detail(
-        self, client: AsyncClient, app
-    ) -> None:
+    async def test_bad_token_silently_treated_as_anonymous_in_detail(self, client: AsyncClient, app) -> None:
         """携带无效 token 访问策略详情时，软鉴权静默降级为匿名，返回 HTTP 200。"""
         from src.core.deps import get_db
 
@@ -639,9 +605,7 @@ class TestStrategyListDefaultPagination:
     """策略列表默认分页参数验证（需求 2.4）。"""
 
     @pytest.mark.asyncio
-    async def test_no_pagination_params_defaults_to_page1_size20(
-        self, client: AsyncClient, app
-    ) -> None:
+    async def test_no_pagination_params_defaults_to_page1_size20(self, client: AsyncClient, app) -> None:
         """不传分页参数时，接口默认返回第 1 页每页 20 条，响应含 items/total/page/page_size（需求 2.4）。"""
         from src.core.deps import get_db
 

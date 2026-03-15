@@ -7,10 +7,9 @@
   - require_membership 在等级不足时抛出 MembershipError（code=1003）
 """
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-
 
 # 测试用固定密钥
 TEST_SECRET = "test-secret-key-for-deps-tests-256bits"
@@ -52,14 +51,10 @@ class TestGetCurrentUser:
     """get_current_user 依赖注入测试。"""
 
     @pytest.mark.asyncio
-    async def test_returns_user_when_token_valid(
-        self, setup_env, security_utils
-    ) -> None:
+    async def test_returns_user_when_token_valid(self, setup_env, security_utils) -> None:
         from src.core.enums import MembershipTier
 
-        token = security_utils.create_access_token(
-            sub="1", membership=MembershipTier.FREE
-        )
+        token = security_utils.create_access_token(sub="1", membership=MembershipTier.FREE)
         mock_user = make_mock_user(user_id=1, membership="free", is_active=True)
         mock_db = AsyncMock()
         mock_db.get.return_value = mock_user
@@ -74,15 +69,11 @@ class TestGetCurrentUser:
         mock_db.get.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_raises_when_user_is_inactive(
-        self, setup_env, security_utils
-    ) -> None:
+    async def test_raises_when_user_is_inactive(self, setup_env, security_utils) -> None:
         from src.core.enums import MembershipTier
         from src.core.exceptions import AuthenticationError
 
-        token = security_utils.create_access_token(
-            sub="1", membership=MembershipTier.FREE
-        )
+        token = security_utils.create_access_token(sub="1", membership=MembershipTier.FREE)
         mock_user = make_mock_user(user_id=1, is_active=False)
         mock_db = AsyncMock()
         mock_db.get.return_value = mock_user
@@ -96,15 +87,11 @@ class TestGetCurrentUser:
             await get_current_user(credentials=mock_credentials, db=mock_db)
 
     @pytest.mark.asyncio
-    async def test_raises_when_user_not_found(
-        self, setup_env, security_utils
-    ) -> None:
+    async def test_raises_when_user_not_found(self, setup_env, security_utils) -> None:
         from src.core.enums import MembershipTier
         from src.core.exceptions import AuthenticationError
 
-        token = security_utils.create_access_token(
-            sub="999", membership=MembershipTier.FREE
-        )
+        token = security_utils.create_access_token(sub="999", membership=MembershipTier.FREE)
         mock_db = AsyncMock()
         mock_db.get.return_value = None  # 用户不存在
 
@@ -136,7 +123,6 @@ class TestGetOptionalUser:
     @pytest.mark.asyncio
     async def test_returns_none_when_no_auth_header(self, setup_env) -> None:
         from starlette.requests import Request
-        from starlette.testclient import TestClient
 
         mock_request = MagicMock(spec=Request)
         mock_request.headers = {}
@@ -161,15 +147,12 @@ class TestGetOptionalUser:
         assert result is None
 
     @pytest.mark.asyncio
-    async def test_returns_user_when_token_valid(
-        self, setup_env, security_utils
-    ) -> None:
+    async def test_returns_user_when_token_valid(self, setup_env, security_utils) -> None:
         from starlette.requests import Request
+
         from src.core.enums import MembershipTier
 
-        token = security_utils.create_access_token(
-            sub="1", membership=MembershipTier.VIP1
-        )
+        token = security_utils.create_access_token(sub="1", membership=MembershipTier.VIP1)
         mock_user = make_mock_user(user_id=1, membership="vip1", is_active=True)
         mock_db = AsyncMock()
         mock_db.get.return_value = mock_user
@@ -183,16 +166,13 @@ class TestGetOptionalUser:
         assert result == mock_user
 
     @pytest.mark.asyncio
-    async def test_returns_none_when_user_inactive(
-        self, setup_env, security_utils
-    ) -> None:
+    async def test_returns_none_when_user_inactive(self, setup_env, security_utils) -> None:
         """is_active=False 的用户，get_optional_user 应返回 None（不抛异常）。"""
         from starlette.requests import Request
+
         from src.core.enums import MembershipTier
 
-        token = security_utils.create_access_token(
-            sub="1", membership=MembershipTier.FREE
-        )
+        token = security_utils.create_access_token(sub="1", membership=MembershipTier.FREE)
         mock_user = make_mock_user(user_id=1, is_active=False)
         mock_db = AsyncMock()
         mock_db.get.return_value = mock_user

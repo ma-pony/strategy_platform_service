@@ -118,9 +118,7 @@ class StrategyRead(BaseModel):
     model_config = {"from_attributes": True}
 
     @model_serializer(mode="wrap")
-    def filter_by_tier(
-        self, handler: Any, info: SerializationInfo
-    ) -> dict[str, Any]:
+    def filter_by_tier(self, handler: Any, info: SerializationInfo) -> dict[str, Any]:
         """按会员等级过滤响应字段。
 
         从 info.context 中获取 membership，将低于该等级的字段置为 None
@@ -130,9 +128,7 @@ class StrategyRead(BaseModel):
 
         # 确定当前用户等级
         context = info.context if info else None
-        membership: MembershipTier | None = (
-            context.get("membership") if isinstance(context, dict) else None
-        )
+        membership: MembershipTier | None = context.get("membership") if isinstance(context, dict) else None
         user_tier_idx = _tier_index(membership)
 
         # 遍历模型字段，过滤高于用户等级的字段（从类访问以避免 Pydantic v2.11 警告）
@@ -210,16 +206,12 @@ class BacktestResultRead(BaseModel):
     model_config = {"from_attributes": True}
 
     @model_serializer(mode="wrap")
-    def filter_by_tier(
-        self, handler: Any, info: SerializationInfo
-    ) -> dict[str, Any]:
+    def filter_by_tier(self, handler: Any, info: SerializationInfo) -> dict[str, Any]:
         """按会员等级过滤响应字段。"""
         result: dict[str, Any] = handler(self)
 
         context = info.context if info else None
-        membership: MembershipTier | None = (
-            context.get("membership") if isinstance(context, dict) else None
-        )
+        membership: MembershipTier | None = context.get("membership") if isinstance(context, dict) else None
         user_tier_idx = _tier_index(membership)
 
         for field_name, field_info in self.__class__.model_fields.items():
@@ -269,16 +261,12 @@ class SignalRead(BaseModel):
     model_config = {"from_attributes": True}
 
     @model_serializer(mode="wrap")
-    def filter_by_tier(
-        self, handler: Any, info: SerializationInfo
-    ) -> dict[str, Any]:
+    def filter_by_tier(self, handler: Any, info: SerializationInfo) -> dict[str, Any]:
         """按会员等级过滤 confidence_score 字段。"""
         result: dict[str, Any] = handler(self)
 
         context = info.context if info else None
-        membership: MembershipTier | None = (
-            context.get("membership") if isinstance(context, dict) else None
-        )
+        membership: MembershipTier | None = context.get("membership") if isinstance(context, dict) else None
         user_tier_idx = _tier_index(membership)
 
         for field_name, field_info in self.__class__.model_fields.items():

@@ -7,8 +7,9 @@
   - 不提供任何写入方法
 """
 
+from unittest.mock import AsyncMock, MagicMock
+
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 
 from src.core.exceptions import NotFoundError
 
@@ -61,8 +62,8 @@ class TestStrategyServiceListStrategies:
     @pytest.mark.asyncio
     async def test_list_strategies_returns_strategies(self) -> None:
         """有数据时返回策略列表。"""
-        from src.services.strategy_service import StrategyService
         from src.models.strategy import Strategy
+        from src.services.strategy_service import StrategyService
 
         db = AsyncMock()
 
@@ -91,8 +92,8 @@ class TestStrategyServiceGetStrategy:
     @pytest.mark.asyncio
     async def test_get_strategy_returns_strategy_when_found(self) -> None:
         """策略存在时返回 Strategy 对象。"""
-        from src.services.strategy_service import StrategyService
         from src.models.strategy import Strategy
+        from src.services.strategy_service import StrategyService
 
         db = AsyncMock()
         mock_strategy = MagicMock(spec=Strategy)

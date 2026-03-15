@@ -45,9 +45,7 @@ class TestLifespanApp:
             app = create_app_with_lifespan()
             assert isinstance(app, FastAPI)
 
-    def test_create_app_with_lifespan_has_lifespan_configured(
-        self, env_setup
-    ) -> None:
+    def test_create_app_with_lifespan_has_lifespan_configured(self, env_setup) -> None:
         """create_app_with_lifespan() 的 FastAPI 实例应配置了 lifespan 上下文管理器。"""
         with patch("sqlalchemy.create_engine") as mock_engine_factory:
             mock_engine = MagicMock()
@@ -73,9 +71,7 @@ class TestLifespanApp:
             api_routes = [r for r in routes if r.startswith("/api/v1")]
             assert len(api_routes) > 0
 
-    def test_create_app_with_lifespan_registers_exception_handlers(
-        self, env_setup
-    ) -> None:
+    def test_create_app_with_lifespan_registers_exception_handlers(self, env_setup) -> None:
         """create_app_with_lifespan() 应注册全局异常处理器。"""
         from fastapi.exceptions import RequestValidationError
 

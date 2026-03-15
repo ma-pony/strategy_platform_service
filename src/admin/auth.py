@@ -37,12 +37,8 @@ class AdminAuth(AuthenticationBackend):
     ) -> None:
         super().__init__(secret_key=secret_key)
         # 优先使用传入参数，否则从环境变量读取
-        self._admin_username = admin_username or os.environ.get(
-            "ADMIN_USERNAME", "admin"
-        )
-        self._admin_password = admin_password or os.environ.get(
-            "ADMIN_PASSWORD", "admin"
-        )
+        self._admin_username = admin_username or os.environ.get("ADMIN_USERNAME", "admin")
+        self._admin_password = admin_password or os.environ.get("ADMIN_PASSWORD", "admin")
 
     async def login(self, request: Request) -> bool:
         """验证管理员凭证并在成功时设置 session token。

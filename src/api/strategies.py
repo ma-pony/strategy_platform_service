@@ -14,7 +14,6 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.deps import get_db, get_optional_user
-from src.core.exceptions import NotFoundError
 from src.core.response import ApiResponse, PaginatedData, ok, paginated
 from src.schemas.strategy import StrategyRead
 from src.services.strategy_service import StrategyService
@@ -36,9 +35,7 @@ async def list_strategies(
     匿名和已登录用户均可访问。
     字段按会员等级过滤：匿名仅基础字段，Free 含中级指标，VIP 含全部字段。
     """
-    strategies, total = await _strategy_service.list_strategies(
-        db, page=page, page_size=page_size
-    )
+    strategies, total = await _strategy_service.list_strategies(db, page=page, page_size=page_size)
 
     # 确定当前用户会员等级
     membership = current_user.membership if current_user is not None else None

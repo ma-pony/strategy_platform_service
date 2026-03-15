@@ -22,18 +22,14 @@ class TestApplicationRunner:
         runner._handle_signal(signal.SIGINT, None)
         assert runner._shutdown_event is True
 
-    def test_start_completes_with_valid_config(
-        self, clear_settings_cache: None
-    ) -> None:
+    def test_start_completes_with_valid_config(self, clear_settings_cache: None) -> None:
         """有效配置下 ApplicationRunner.start() 完成初始化不抛出异常。"""
         os.environ.pop("APP_ENV", None)
         runner = ApplicationRunner()
         # start() 应正常完成（占位主循环立即返回）
         runner.start()
 
-    def test_start_missing_config_calls_exit(
-        self, clear_settings_cache: None, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_start_missing_config_calls_exit(self, clear_settings_cache: None, monkeypatch: pytest.MonkeyPatch) -> None:
         """缺少必填配置时 start() 以非零退出码退出。"""
         from pydantic import ValidationError
 
@@ -61,9 +57,7 @@ class TestApplicationRunner:
             runner.start()
         assert exc_info.value.code != 0
 
-    def test_shutdown_calls_exit_zero(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_shutdown_calls_exit_zero(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """shutdown() 以 exit(0) 退出。"""
         exit_calls: list[int] = []
 
@@ -94,9 +88,7 @@ class TestApplicationRunner:
             raise RuntimeError("unexpected error")
 
         monkeypatch.setattr("sys.exit", mock_exit)
-        monkeypatch.setattr(
-            main_module.ApplicationRunner, "_run_service", mock_run_service
-        )
+        monkeypatch.setattr(main_module.ApplicationRunner, "_run_service", mock_run_service)
 
         runner = ApplicationRunner()
         with pytest.raises(SystemExit) as exc_info:
@@ -111,9 +103,7 @@ class TestMainFunction:
         """main() 函数应可调用。"""
         assert callable(main)
 
-    def test_main_creates_runner_and_starts(
-        self, clear_settings_cache: None
-    ) -> None:
+    def test_main_creates_runner_and_starts(self, clear_settings_cache: None) -> None:
         """main() 调用不抛出异常（有效环境）。"""
         os.environ.pop("APP_ENV", None)
         main()

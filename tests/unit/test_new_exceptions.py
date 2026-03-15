@@ -81,7 +81,7 @@ class TestLoginNotFoundError:
         from src.core.exceptions import LoginNotFoundError
 
         with pytest.raises(LoginNotFoundError):
-            raise LoginNotFoundError()
+            raise LoginNotFoundError
 
 
 class TestAccountDisabledError:
@@ -118,7 +118,7 @@ class TestAccountDisabledError:
         from src.core.exceptions import AccountDisabledError
 
         with pytest.raises(AccountDisabledError):
-            raise AccountDisabledError()
+            raise AccountDisabledError
 
 
 class TestExceptionHandlerMapping:

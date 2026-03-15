@@ -65,10 +65,7 @@ def _validate_float_field(field_name: str, value: float | None) -> None:
     if value is None:
         return
     if value < _FLOAT_MIN or value > _FLOAT_MAX:
-        raise ValueError(
-            f"指标字段 {field_name} 值 {value} 超出合理范围 "
-            f"[{_FLOAT_MIN}, {_FLOAT_MAX}]，拒绝写入。"
-        )
+        raise ValueError(f"指标字段 {field_name} 值 {value} 超出合理范围 [{_FLOAT_MIN}, {_FLOAT_MAX}]，拒绝写入。")
 
 
 def _validate_trade_count(value: int | None) -> None:
@@ -83,6 +80,4 @@ def _validate_trade_count(value: int | None) -> None:
     if value is None:
         return
     if value < 0:
-        raise ValueError(
-            f"指标字段 trade_count 值 {value} 为负数，非法，拒绝写入。"
-        )
+        raise ValueError(f"指标字段 trade_count 值 {value} 为负数，非法，拒绝写入。")

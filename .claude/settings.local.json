@@ -105,7 +105,11 @@
       "Bash(TEST_DATABASE_URL=postgresql+asyncpg://postgres:123456@localhost:5432/strategy_platform_test uv run python -m pytest tests/integration/test_real_db_fixtures.py::TestRealDbSessionIsolation tests/integration/test_real_db_persistence.py -v --no-cov --tb=short 2>&1 | tail -30)",
       "Bash(TEST_DATABASE_URL=postgresql+asyncpg://postgres:123456@localhost:5432/strategy_platform_test uv run python -m pytest tests/ -v --no-cov --tb=short 2>&1 | tail -40)",
       "Bash(TOKEN=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIyIiwibWVtYmVyc2hpcCI6ImZyZWUiLCJleHAiOjE3NzM1NTE0MzAsImlhdCI6MTc3MzU0OTYzMCwidHlwZSI6ImFjY2VzcyJ9._uZRlS0IAbMZk3nLOTlQ1Sfj5Gzxnm44GJmKTiZa-i4\"\n\necho \"=== Signals for strategy 1 \\(FREE user, first signal\\) ===\"\ncurl -s \"http://localhost:8000/api/v1/strategies/1/signals\" -H \"Authorization: Bearer $TOKEN\" | python3 -c \"\nimport sys, json\nresp = json.load\\(sys.stdin\\)\nsignals = resp['data']['signals']\nprint\\(f'Total signals returned: {len\\(signals\\)}'\\)\nif signals:\n    sig = signals[0]\n    print\\('Fields present:', sorted\\(sig.keys\\(\\)\\)\\)\n    # Check VIP-restricted fields\n    for field in ['stop_loss', 'take_profit', 'confidence_score', 'indicator_values']:\n        print\\(f'  {field}: {sig.get\\(field, \\\\\"MISSING\\\\\"\\)}'\\)\n\"\n\necho \"\"\necho \"=== Signals for strategy 1 \\(anonymous, first signal\\) ===\"\ncurl -s \"http://localhost:8000/api/v1/strategies/1/signals\" | python3 -c \"\nimport sys, json\nresp = json.load\\(sys.stdin\\)\nsignals = resp['data']['signals']\nprint\\(f'Total signals returned: {len\\(signals\\)}'\\)\nif signals:\n    sig = signals[0]\n    print\\('Fields present:', sorted\\(sig.keys\\(\\)\\)\\)\n    for field in ['stop_loss', 'take_profit', 'confidence_score', 'indicator_values']:\n        print\\(f'  {field}: {sig.get\\(field, \\\\\"MISSING\\\\\"\\)}'\\)\n\")",
-      "Skill(kiro:spec-impl)"
+      "Skill(kiro:spec-impl)",
+      "Bash(cat:*)",
+      "Bash(freqtrade create-userdir:*)",
+      "mcp__chrome-devtools__take_screenshot",
+      "Bash(.venv/bin/ruff check:*)"
     ]
   },
   "enableAllProjectMcpServers": true,

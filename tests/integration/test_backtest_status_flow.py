@@ -9,9 +9,8 @@
 Requirements: 1.4, 1.5, 1.6, 2.5, 3.3
 """
 
-import datetime
 from pathlib import Path
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -27,6 +26,7 @@ def env_setup(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("REDIS_URL", "redis://localhost:6379/0")
 
     from src.core import app_settings
+
     app_settings.get_settings.cache_clear()
     yield
     app_settings.get_settings.cache_clear()
@@ -159,7 +159,7 @@ class TestBacktestStatusFlow:
                 status_changes.append(value)
 
         # 使用真实 BacktestTask 来跟踪状态流转
-        from src.models.backtest import BacktestTask, BacktestResult
+        from src.models.backtest import BacktestResult, BacktestTask
 
         added_records: list = []
 
@@ -179,7 +179,9 @@ class TestBacktestStatusFlow:
 
         with patch("src.workers.tasks.backtest_tasks.SyncSessionLocal", _make_session_factory(mock_session)):
             with patch("src.freqtrade_bridge.strategy_registry.lookup", return_value=_make_registry_entry()):
-                with patch("src.workers.tasks.backtest_tasks.run_backtest_subprocess", return_value=_make_backtest_output()):
+                with patch(
+                    "src.workers.tasks.backtest_tasks.run_backtest_subprocess", return_value=_make_backtest_output()
+                ):
                     with patch("src.workers.tasks.backtest_tasks.generate_config", return_value=MagicMock()):
                         with patch("src.workers.tasks.backtest_tasks.cleanup_task_dir"):
                             run_backtest_task(strategy_id=1)
@@ -220,7 +222,9 @@ class TestBacktestStatusFlow:
 
         with patch("src.workers.tasks.backtest_tasks.SyncSessionLocal", _make_session_factory(mock_session)):
             with patch("src.freqtrade_bridge.strategy_registry.lookup", return_value=_make_registry_entry()):
-                with patch("src.workers.tasks.backtest_tasks.run_backtest_subprocess", return_value=_make_backtest_output()):
+                with patch(
+                    "src.workers.tasks.backtest_tasks.run_backtest_subprocess", return_value=_make_backtest_output()
+                ):
                     with patch("src.workers.tasks.backtest_tasks.generate_config", return_value=MagicMock()):
                         with patch("src.workers.tasks.backtest_tasks.cleanup_task_dir"):
                             run_backtest_task(strategy_id=1)
@@ -276,7 +280,8 @@ class TestBacktestResultMetrics:
     """验证 BacktestResult 六项指标正确写入。"""
 
     def test_six_metrics_correctly_written_to_backtest_result(self, env_setup) -> None:
-        """BacktestResult 六项指标（total_return、annual_return、sharpe_ratio、max_drawdown、trade_count、win_rate）值正确。"""
+        """BacktestResult 六项指标（total_return、annual_return、sharpe_ratio、
+        max_drawdown、trade_count、win_rate）值正确。"""
         from src.models.backtest import BacktestResult, BacktestTask
         from src.workers.tasks.backtest_tasks import run_backtest_task
 
@@ -488,7 +493,9 @@ class TestBacktestSignalInsert:
 
         with patch("src.workers.tasks.backtest_tasks.SyncSessionLocal", _make_session_factory(mock_session)):
             with patch("src.freqtrade_bridge.strategy_registry.lookup", return_value=_make_registry_entry()):
-                with patch("src.workers.tasks.backtest_tasks.run_backtest_subprocess", return_value=_make_backtest_output()):
+                with patch(
+                    "src.workers.tasks.backtest_tasks.run_backtest_subprocess", return_value=_make_backtest_output()
+                ):
                     with patch("src.workers.tasks.backtest_tasks.generate_config", return_value=MagicMock()):
                         with patch("src.workers.tasks.backtest_tasks.cleanup_task_dir"):
                             run_backtest_task(strategy_id=1)
@@ -560,10 +567,10 @@ class TestStrategyNullFieldUpdate:
         original_sharpe = 3.5
         original_win_rate = 0.72
         mock_strategy = _make_mock_strategy(
-            trade_count=None,     # NULL，应被填充
-            max_drawdown=None,    # NULL，应被填充
-            sharpe_ratio=original_sharpe,    # 非 NULL，不应被覆盖
-            win_rate=original_win_rate,      # 非 NULL，不应被覆盖
+            trade_count=None,  # NULL，应被填充
+            max_drawdown=None,  # NULL，应被填充
+            sharpe_ratio=original_sharpe,  # 非 NULL，不应被覆盖
+            win_rate=original_win_rate,  # 非 NULL，不应被覆盖
         )
 
         mock_session = _make_mock_session()
@@ -596,10 +603,12 @@ class TestStrategyNullFieldUpdate:
         assert mock_strategy.max_drawdown == pytest.approx(0.08), "NULL 的 max_drawdown 应被填充"
 
         # 验证非 NULL 字段未被覆盖
-        assert mock_strategy.sharpe_ratio == pytest.approx(original_sharpe), \
+        assert mock_strategy.sharpe_ratio == pytest.approx(original_sharpe), (
             f"非 NULL 的 sharpe_ratio ({original_sharpe}) 不应被覆盖"
-        assert mock_strategy.win_rate == pytest.approx(original_win_rate), \
+        )
+        assert mock_strategy.win_rate == pytest.approx(original_win_rate), (
             f"非 NULL 的 win_rate ({original_win_rate}) 不应被覆盖"
+        )
 
     def test_all_non_null_fields_unchanged(self, env_setup) -> None:
         """所有字段均非 NULL 时，Strategy 不被修改。"""
@@ -672,7 +681,9 @@ class TestBacktestTempDirCleanup:
 
         with patch("src.workers.tasks.backtest_tasks.SyncSessionLocal", _make_session_factory(mock_session)):
             with patch("src.freqtrade_bridge.strategy_registry.lookup", return_value=_make_registry_entry()):
-                with patch("src.workers.tasks.backtest_tasks.run_backtest_subprocess", return_value=_make_backtest_output()):
+                with patch(
+                    "src.workers.tasks.backtest_tasks.run_backtest_subprocess", return_value=_make_backtest_output()
+                ):
                     with patch("src.workers.tasks.backtest_tasks.generate_config", return_value=MagicMock()):
                         with patch("src.workers.tasks.backtest_tasks.cleanup_task_dir") as mock_cleanup:
                             run_backtest_task(strategy_id=1)

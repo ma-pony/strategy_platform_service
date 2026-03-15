@@ -342,11 +342,7 @@ class PairMetricsService:
             filters.append(StrategyPairMetrics.timeframe == timeframe_filter)
 
         # 查询总数
-        count_stmt = (
-            select(func.count())
-            .select_from(StrategyPairMetrics)
-            .where(*filters)
-        )
+        count_stmt = select(func.count()).select_from(StrategyPairMetrics).where(*filters)
         count_result = await db.execute(count_stmt)
         total: int = count_result.scalar_one()
 
@@ -396,16 +392,11 @@ class PairMetricsService:
         metric = result.scalar_one_or_none()
 
         if metric is None:
-            raise NotFoundError(
-                f"策略对绩效记录不存在：strategy_id={strategy_id}, "
-                f"pair={pair}, timeframe={timeframe}"
-            )
+            raise NotFoundError(f"策略对绩效记录不存在：strategy_id={strategy_id}, pair={pair}, timeframe={timeframe}")
 
         return metric
 
-    async def _verify_strategy_exists(
-        self, db: AsyncSession, strategy_id: int
-    ) -> None:
+    async def _verify_strategy_exists(self, db: AsyncSession, strategy_id: int) -> None:
         """验证 strategy_id 对应策略是否存在。
 
         Raises:

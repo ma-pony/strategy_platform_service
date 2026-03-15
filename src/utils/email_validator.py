@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 # 在模块加载时检测 email-validator 库可用性
 _EMAIL_VALIDATOR_AVAILABLE = False
 try:
-    import email_validator as _ev_lib
+    import email_validator as _ev_lib  # noqa: F401
 
     _EMAIL_VALIDATOR_AVAILABLE = True
 except ImportError:
@@ -52,8 +52,7 @@ class EmailValidator:
 
         if _EMAIL_VALIDATOR_AVAILABLE:
             return EmailValidator._validate_with_library(email)
-        else:
-            return EmailValidator._validate_with_fallback(email)
+        return EmailValidator._validate_with_fallback(email)
 
     @staticmethod
     def _validate_with_library(email: str) -> str:

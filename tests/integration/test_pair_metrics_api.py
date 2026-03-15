@@ -30,6 +30,7 @@ def env_setup(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("REDIS_URL", "redis://localhost:6379/0")
 
     from src.core import app_settings
+
     app_settings.get_settings.cache_clear()
     yield
     app_settings.get_settings.cache_clear()
@@ -39,15 +40,14 @@ def env_setup(monkeypatch: pytest.MonkeyPatch):
 def app(env_setup):
     """创建测试用 FastAPI 应用实例。"""
     from src.api.main_router import create_app
+
     return create_app()
 
 
 @pytest.fixture()
 async def client(app) -> AsyncGenerator[AsyncClient, None]:
     """提供绑定测试应用的异步 HTTP 客户端。"""
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as ac:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         yield ac
 
 
@@ -82,9 +82,7 @@ class TestPairMetricsListEndpoint:
     """GET /api/v1/strategies/{strategy_id}/pair-metrics 分页列表端点测试。"""
 
     @pytest.mark.anyio
-    async def test_returns_200_with_valid_strategy(
-        self, client: AsyncClient, env_setup: None
-    ) -> None:
+    async def test_returns_200_with_valid_strategy(self, client: AsyncClient, env_setup: None) -> None:
         """有效 strategy_id 应返回 HTTP 200。"""
         mock_metrics = [_make_mock_metric()]
 
@@ -100,9 +98,7 @@ class TestPairMetricsListEndpoint:
         assert data["code"] == 0
 
     @pytest.mark.anyio
-    async def test_anonymous_response_hides_profit_factor(
-        self, client: AsyncClient, env_setup: None
-    ) -> None:
+    async def test_anonymous_response_hides_profit_factor(self, client: AsyncClient, env_setup: None) -> None:
         """匿名请求时，profit_factor 应为 None（需求 4.2）。"""
         mock_metrics = [_make_mock_metric(profit_factor=1.75)]
 
@@ -119,9 +115,7 @@ class TestPairMetricsListEndpoint:
         assert items[0]["profit_factor"] is None
 
     @pytest.mark.anyio
-    async def test_anonymous_response_shows_basic_fields(
-        self, client: AsyncClient, env_setup: None
-    ) -> None:
+    async def test_anonymous_response_shows_basic_fields(self, client: AsyncClient, env_setup: None) -> None:
         """匿名请求应返回 pair、timeframe、total_return、trade_count（需求 4.2）。"""
         mock_metrics = [_make_mock_metric()]
 
@@ -139,9 +133,7 @@ class TestPairMetricsListEndpoint:
         assert item["trade_count"] is not None
 
     @pytest.mark.anyio
-    async def test_strategy_not_found_returns_404(
-        self, client: AsyncClient, env_setup: None
-    ) -> None:
+    async def test_strategy_not_found_returns_404(self, client: AsyncClient, env_setup: None) -> None:
         """strategy_id 不存在时应返回 HTTP 404，code=3001（需求 4.4）。"""
         from src.core.exceptions import NotFoundError
 
@@ -156,9 +148,7 @@ class TestPairMetricsListEndpoint:
         assert response.json()["code"] == 3001
 
     @pytest.mark.anyio
-    async def test_pagination_params_passed_correctly(
-        self, client: AsyncClient, env_setup: None
-    ) -> None:
+    async def test_pagination_params_passed_correctly(self, client: AsyncClient, env_setup: None) -> None:
         """page 和 page_size 参数应正确传递给 service（需求 4.5）。"""
         mock_metrics = [_make_mock_metric()]
 
@@ -167,9 +157,7 @@ class TestPairMetricsListEndpoint:
             new_callable=AsyncMock,
             return_value=(mock_metrics, 10),
         ) as mock_service:
-            response = await client.get(
-                "/api/v1/strategies/1/pair-metrics?page=2&page_size=5"
-            )
+            response = await client.get("/api/v1/strategies/1/pair-metrics?page=2&page_size=5")
 
         assert response.status_code == 200
         # 验证 service 被以正确参数调用
@@ -178,9 +166,7 @@ class TestPairMetricsListEndpoint:
         assert call_kwargs.get("page_size") == 5
 
     @pytest.mark.anyio
-    async def test_response_contains_pagination_metadata(
-        self, client: AsyncClient, env_setup: None
-    ) -> None:
+    async def test_response_contains_pagination_metadata(self, client: AsyncClient, env_setup: None) -> None:
         """响应应包含分页元数据（total、page、page_size）。"""
         mock_metrics = [_make_mock_metric()]
 
@@ -198,9 +184,7 @@ class TestPairMetricsListEndpoint:
         assert data["total"] == 5
 
     @pytest.mark.anyio
-    async def test_pair_filter_passed_to_service(
-        self, client: AsyncClient, env_setup: None
-    ) -> None:
+    async def test_pair_filter_passed_to_service(self, client: AsyncClient, env_setup: None) -> None:
         """?pair 过滤参数应传递给 service（需求 4.5）。"""
         mock_metrics = [_make_mock_metric()]
 
@@ -209,18 +193,14 @@ class TestPairMetricsListEndpoint:
             new_callable=AsyncMock,
             return_value=(mock_metrics, 1),
         ) as mock_service:
-            response = await client.get(
-                "/api/v1/strategies/1/pair-metrics?pair=BTC/USDT"
-            )
+            response = await client.get("/api/v1/strategies/1/pair-metrics?pair=BTC/USDT")
 
         assert response.status_code == 200
         call_kwargs = mock_service.call_args.kwargs
         assert call_kwargs.get("pair_filter") == "BTC/USDT"
 
     @pytest.mark.anyio
-    async def test_timeframe_filter_passed_to_service(
-        self, client: AsyncClient, env_setup: None
-    ) -> None:
+    async def test_timeframe_filter_passed_to_service(self, client: AsyncClient, env_setup: None) -> None:
         """?timeframe 过滤参数应传递给 service（需求 4.5）。"""
         mock_metrics = [_make_mock_metric()]
 
@@ -229,9 +209,7 @@ class TestPairMetricsListEndpoint:
             new_callable=AsyncMock,
             return_value=(mock_metrics, 1),
         ) as mock_service:
-            response = await client.get(
-                "/api/v1/strategies/1/pair-metrics?timeframe=4h"
-            )
+            response = await client.get("/api/v1/strategies/1/pair-metrics?timeframe=4h")
 
         assert response.status_code == 200
         call_kwargs = mock_service.call_args.kwargs
@@ -242,9 +220,7 @@ class TestPairMetricDetailEndpoint:
     """GET /api/v1/strategies/{strategy_id}/pair-metrics/{pair}/{timeframe} 单条端点测试。"""
 
     @pytest.mark.anyio
-    async def test_returns_200_for_existing_metric(
-        self, client: AsyncClient, env_setup: None
-    ) -> None:
+    async def test_returns_200_for_existing_metric(self, client: AsyncClient, env_setup: None) -> None:
         """存在的策略对记录应返回 HTTP 200。"""
         mock_metric = _make_mock_metric()
 
@@ -253,17 +229,13 @@ class TestPairMetricDetailEndpoint:
             new_callable=AsyncMock,
             return_value=mock_metric,
         ):
-            response = await client.get(
-                "/api/v1/strategies/1/pair-metrics/BTC%2FUSDT/1h"
-            )
+            response = await client.get("/api/v1/strategies/1/pair-metrics/BTC%2FUSDT/1h")
 
         assert response.status_code == 200
         assert response.json()["code"] == 0
 
     @pytest.mark.anyio
-    async def test_strategy_not_found_returns_404_code_3001(
-        self, client: AsyncClient, env_setup: None
-    ) -> None:
+    async def test_strategy_not_found_returns_404_code_3001(self, client: AsyncClient, env_setup: None) -> None:
         """strategy_id 不存在时返回 HTTP 404，code=3001（需求 4.4）。"""
         from src.core.exceptions import NotFoundError
 
@@ -272,17 +244,13 @@ class TestPairMetricDetailEndpoint:
             new_callable=AsyncMock,
             side_effect=NotFoundError("策略不存在"),
         ):
-            response = await client.get(
-                "/api/v1/strategies/999/pair-metrics/BTC%2FUSDT/1h"
-            )
+            response = await client.get("/api/v1/strategies/999/pair-metrics/BTC%2FUSDT/1h")
 
         assert response.status_code == 404
         assert response.json()["code"] == 3001
 
     @pytest.mark.anyio
-    async def test_metric_not_found_returns_404(
-        self, client: AsyncClient, env_setup: None
-    ) -> None:
+    async def test_metric_not_found_returns_404(self, client: AsyncClient, env_setup: None) -> None:
         """记录不存在时返回 HTTP 404，code=3001（需求 4.6）。"""
         from src.core.exceptions import NotFoundError
 
@@ -291,16 +259,12 @@ class TestPairMetricDetailEndpoint:
             new_callable=AsyncMock,
             side_effect=NotFoundError("记录不存在"),
         ):
-            response = await client.get(
-                "/api/v1/strategies/1/pair-metrics/BTC%2FUSDT/4h"
-            )
+            response = await client.get("/api/v1/strategies/1/pair-metrics/BTC%2FUSDT/4h")
 
         assert response.status_code == 404
 
     @pytest.mark.anyio
-    async def test_pair_url_decoded_correctly(
-        self, client: AsyncClient, env_setup: None
-    ) -> None:
+    async def test_pair_url_decoded_correctly(self, client: AsyncClient, env_setup: None) -> None:
         """URL 编码的 pair 参数（BTC%2FUSDT）应正确解码为 BTC/USDT 传递给 service。"""
         mock_metric = _make_mock_metric()
 
@@ -309,9 +273,7 @@ class TestPairMetricDetailEndpoint:
             new_callable=AsyncMock,
             return_value=mock_metric,
         ) as mock_service:
-            response = await client.get(
-                "/api/v1/strategies/1/pair-metrics/BTC%2FUSDT/1h"
-            )
+            response = await client.get("/api/v1/strategies/1/pair-metrics/BTC%2FUSDT/1h")
 
         assert response.status_code == 200
         call_kwargs = mock_service.call_args.kwargs

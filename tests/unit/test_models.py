@@ -227,9 +227,9 @@ class TestStrategyModel:
 
     def test_strategy_is_active_default_true_via_db(self) -> None:
         """Strategy is_active 数据库默认值应为 True（通过 SQLite 验证）。"""
-        import src.models.backtest  # noqa: F401
-        import src.models.report  # noqa: F401
-        import src.models.signal  # noqa: F401
+        import src.models.backtest
+        import src.models.report
+        import src.models.signal
         import src.models.user  # noqa: F401
         from src.models.strategy import Strategy
 
@@ -284,9 +284,7 @@ class TestStrategyModel:
         table = Strategy.__table__
         # 检查是否有包含 is_active 的索引
         has_is_active_index = any(
-            "is_active" in idx.name
-            or any(col.name == "is_active" for col in idx.columns)
-            for idx in table.indexes
+            "is_active" in idx.name or any(col.name == "is_active" for col in idx.columns) for idx in table.indexes
         )
         assert has_is_active_index
 
@@ -325,22 +323,16 @@ class TestBacktestTaskModel:
 
         table = BacktestTask.__table__
         # 查找唯一约束
-        unique_constraints = [
-            c for c in table.constraints
-            if isinstance(c, UniqueConstraint)
-        ]
-        col_sets = [
-            frozenset(col.name for col in uc.columns)
-            for uc in unique_constraints
-        ]
+        unique_constraints = [c for c in table.constraints if isinstance(c, UniqueConstraint)]
+        col_sets = [frozenset(col.name for col in uc.columns) for uc in unique_constraints]
         assert frozenset({"strategy_id", "scheduled_date"}) in col_sets
 
     def test_backtest_task_status_default_pending_via_db(self) -> None:
         """BacktestTask status 数据库默认值应为 PENDING（通过 SQLite 验证）。"""
         import datetime
 
-        import src.models.report  # noqa: F401
-        import src.models.signal  # noqa: F401
+        import src.models.report
+        import src.models.signal
         import src.models.user  # noqa: F401
         from src.models.backtest import BacktestTask
         from src.models.strategy import Strategy
@@ -407,10 +399,18 @@ class TestBacktestResultModel:
         mapper = class_mapper(BacktestResult)
         column_names = {c.key for c in mapper.columns}
         required = {
-            "id", "strategy_id", "task_id",
-            "total_return", "annual_return", "sharpe_ratio",
-            "max_drawdown", "trade_count", "win_rate",
-            "period_start", "period_end", "created_at",
+            "id",
+            "strategy_id",
+            "task_id",
+            "total_return",
+            "annual_return",
+            "sharpe_ratio",
+            "max_drawdown",
+            "trade_count",
+            "win_rate",
+            "period_start",
+            "period_end",
+            "created_at",
         }
         for col in required:
             assert col in column_names, f"缺少字段: {col}"
@@ -488,8 +488,13 @@ class TestTradingSignalModel:
         mapper = class_mapper(TradingSignal)
         column_names = {c.key for c in mapper.columns}
         required = {
-            "id", "strategy_id", "pair", "direction",
-            "confidence_score", "signal_at", "created_at",
+            "id",
+            "strategy_id",
+            "pair",
+            "direction",
+            "confidence_score",
+            "signal_at",
+            "created_at",
         }
         for col in required:
             assert col in column_names, f"缺少字段: {col}"
@@ -569,8 +574,13 @@ class TestResearchReportModel:
         mapper = class_mapper(ResearchReport)
         column_names = {c.key for c in mapper.columns}
         required = {
-            "id", "title", "summary", "content",
-            "generated_at", "created_at", "updated_at",
+            "id",
+            "title",
+            "summary",
+            "content",
+            "generated_at",
+            "created_at",
+            "updated_at",
         }
         for col in required:
             assert col in column_names, f"缺少字段: {col}"
@@ -677,10 +687,10 @@ class TestModelsRegisteredInMetadata:
     def test_all_tables_in_metadata(self) -> None:
         """所有业务表应注册到 Base.metadata。"""
         # 先导入所有模型触发注册
-        import src.models.backtest  # noqa: F401
-        import src.models.report  # noqa: F401
-        import src.models.signal  # noqa: F401
-        import src.models.strategy  # noqa: F401
+        import src.models.backtest
+        import src.models.report
+        import src.models.signal
+        import src.models.strategy
         import src.models.user  # noqa: F401
 
         table_names = set(Base.metadata.tables.keys())
@@ -698,10 +708,10 @@ class TestModelsRegisteredInMetadata:
 
     def test_metadata_can_create_tables_in_memory(self) -> None:
         """使用 SQLite 内存数据库验证所有模型可成功建表。"""
-        import src.models.backtest  # noqa: F401
-        import src.models.report  # noqa: F401
-        import src.models.signal  # noqa: F401
-        import src.models.strategy  # noqa: F401
+        import src.models.backtest
+        import src.models.report
+        import src.models.signal
+        import src.models.strategy
         import src.models.user  # noqa: F401
 
         engine = create_engine("sqlite:///:memory:")

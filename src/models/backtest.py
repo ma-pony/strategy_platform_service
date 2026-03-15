@@ -7,6 +7,7 @@ BacktestResult：回测结果值对象，归属于 Strategy 和 BacktestTask。
 import datetime
 
 from sqlalchemy import (
+    JSON,
     Date,
     DateTime,
     Enum,
@@ -14,7 +15,6 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
-    JSON,
     String,
     Text,
     UniqueConstraint,
@@ -104,12 +104,8 @@ class BacktestResult(Base):
     max_drawdown: Mapped[float] = mapped_column(Float, nullable=False)
     trade_count: Mapped[int] = mapped_column(Integer, nullable=False)
     win_rate: Mapped[float] = mapped_column(Float, nullable=False)
-    period_start: Mapped[datetime.datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False
-    )
-    period_end: Mapped[datetime.datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False
-    )
+    period_start: Mapped[datetime.datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    period_end: Mapped[datetime.datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     created_at: Mapped[datetime.datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),

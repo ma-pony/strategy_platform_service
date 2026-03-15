@@ -28,6 +28,7 @@ def env_setup(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("REDIS_URL", "redis://localhost:6379/0")
 
     from src.core import app_settings
+
     app_settings.get_settings.cache_clear()
     yield
     app_settings.get_settings.cache_clear()
@@ -35,13 +36,21 @@ def env_setup(monkeypatch: pytest.MonkeyPatch):
 
 def _make_admin_user():
     return SimpleNamespace(
-        id=1, email="admin@example.com", membership="free", is_active=True, is_admin=True,
+        id=1,
+        email="admin@example.com",
+        membership="free",
+        is_active=True,
+        is_admin=True,
     )
 
 
 def _make_normal_user():
     return SimpleNamespace(
-        id=2, email="user@example.com", membership="free", is_active=True, is_admin=False,
+        id=2,
+        email="user@example.com",
+        membership="free",
+        is_active=True,
+        is_admin=False,
     )
 
 
@@ -66,6 +75,7 @@ def _make_mock_task(
 @pytest.fixture()
 def app(env_setup):
     from src.api.main_router import create_app
+
     return create_app()
 
 
@@ -90,17 +100,13 @@ def non_admin_app(app):
 
 @pytest.fixture()
 async def admin_client(admin_app) -> AsyncGenerator[AsyncClient, None]:
-    async with AsyncClient(
-        transport=ASGITransport(app=admin_app), base_url="http://test"
-    ) as ac:
+    async with AsyncClient(transport=ASGITransport(app=admin_app), base_url="http://test") as ac:
         yield ac
 
 
 @pytest.fixture()
 async def non_admin_client(non_admin_app) -> AsyncGenerator[AsyncClient, None]:
-    async with AsyncClient(
-        transport=ASGITransport(app=non_admin_app), base_url="http://test"
-    ) as ac:
+    async with AsyncClient(transport=ASGITransport(app=non_admin_app), base_url="http://test") as ac:
         yield ac
 
 
@@ -244,9 +250,7 @@ class TestAdminBacktestList:
 @pytest.fixture()
 async def bare_client(app) -> AsyncGenerator[AsyncClient, None]:
     """未覆盖任何认证依赖的原始客户端（用于测试匿名访问）。"""
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as ac:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         yield ac
 
 
@@ -254,9 +258,7 @@ class TestAdminBacktestTask5:
     """任务 5.1 新增测试用例：权限控制、冲突、Not Found 及状态查询。"""
 
     @pytest.mark.asyncio
-    async def test_admin_submit_returns_task_id_and_pending_status(
-        self, admin_client: AsyncClient
-    ) -> None:
+    async def test_admin_submit_returns_task_id_and_pending_status(self, admin_client: AsyncClient) -> None:
         """管理员提交回测 → mock 返回 PENDING 任务 → 响应包含 task_id 和 status:pending。
 
         注：当前路由返回 HTTP 200（非 202），此为已知行为差异，记录于设计文档。
@@ -281,9 +283,7 @@ class TestAdminBacktestTask5:
         assert body["data"]["status"] == "pending"
 
     @pytest.mark.asyncio
-    async def test_anonymous_user_returns_401_on_backtest_submit(
-        self, bare_client: AsyncClient
-    ) -> None:
+    async def test_anonymous_user_returns_401_on_backtest_submit(self, bare_client: AsyncClient) -> None:
         """匿名用户（无 Authorization header）提交回测 → HTTP 401 + code:1001。
 
         需求 3.6：匿名用户调用回测接口，系统返回业务错误码 1001，拒绝创建任务。
@@ -298,9 +298,7 @@ class TestAdminBacktestTask5:
         assert body["code"] == 1001
 
     @pytest.mark.asyncio
-    async def test_running_task_conflict_returns_409_with_code_3002(
-        self, admin_client: AsyncClient
-    ) -> None:
+    async def test_running_task_conflict_returns_409_with_code_3002(self, admin_client: AsyncClient) -> None:
         """重复提交 RUNNING 任务 → mock 抛出 ConflictError → HTTP 409 + code:3002。
 
         需求 3.5：已有任务处于 RUNNING 状态时，返回业务错误码 3002（回测任务冲突）。
@@ -322,9 +320,7 @@ class TestAdminBacktestTask5:
         assert body["code"] == 3002
 
     @pytest.mark.asyncio
-    async def test_strategy_not_found_returns_404_with_code_3001(
-        self, admin_client: AsyncClient
-    ) -> None:
+    async def test_strategy_not_found_returns_404_with_code_3001(self, admin_client: AsyncClient) -> None:
         """策略不存在 → mock 抛出 NotFoundError → HTTP 404 + code:3001。
 
         需求 3.1 错误路径：提交指向不存在策略的回测时，返回 3001。
@@ -346,9 +342,7 @@ class TestAdminBacktestTask5:
         assert body["code"] == 3001
 
     @pytest.mark.asyncio
-    async def test_running_status_query_returns_no_result_data(
-        self, admin_client: AsyncClient
-    ) -> None:
+    async def test_running_status_query_returns_no_result_data(self, admin_client: AsyncClient) -> None:
         """RUNNING 状态任务查询 → 响应不含结果数据（result_summary 为 None）。
 
         需求 3.2：任务处于 RUNNING 状态时，查询接口返回当前状态且不包含结果数据。
@@ -380,9 +374,7 @@ class TestAdminBacktestSubmitValidation:
     """POST /api/v1/admin/backtests 输入验证测试。"""
 
     @pytest.mark.asyncio
-    async def test_invalid_timerange_format_returns_422(
-        self, admin_client: AsyncClient
-    ) -> None:
+    async def test_invalid_timerange_format_returns_422(self, admin_client: AsyncClient) -> None:
         """timerange 格式不合法（不匹配 YYYYMMDD-YYYYMMDD）→ HTTP 422。"""
         resp = await admin_client.post(
             "/api/v1/admin/backtests",
@@ -391,9 +383,7 @@ class TestAdminBacktestSubmitValidation:
         assert resp.status_code == 422
 
     @pytest.mark.asyncio
-    async def test_missing_strategy_id_returns_422(
-        self, admin_client: AsyncClient
-    ) -> None:
+    async def test_missing_strategy_id_returns_422(self, admin_client: AsyncClient) -> None:
         """缺少 strategy_id 字段 → HTTP 422。"""
         resp = await admin_client.post(
             "/api/v1/admin/backtests",
@@ -402,9 +392,7 @@ class TestAdminBacktestSubmitValidation:
         assert resp.status_code == 422
 
     @pytest.mark.asyncio
-    async def test_missing_timerange_returns_422(
-        self, admin_client: AsyncClient
-    ) -> None:
+    async def test_missing_timerange_returns_422(self, admin_client: AsyncClient) -> None:
         """缺少 timerange 字段 → HTTP 422。"""
         resp = await admin_client.post(
             "/api/v1/admin/backtests",
@@ -413,9 +401,7 @@ class TestAdminBacktestSubmitValidation:
         assert resp.status_code == 422
 
     @pytest.mark.asyncio
-    async def test_empty_body_returns_422(
-        self, admin_client: AsyncClient
-    ) -> None:
+    async def test_empty_body_returns_422(self, admin_client: AsyncClient) -> None:
         """空请求体 → HTTP 422。"""
         resp = await admin_client.post(
             "/api/v1/admin/backtests",
@@ -424,9 +410,7 @@ class TestAdminBacktestSubmitValidation:
         assert resp.status_code == 422
 
     @pytest.mark.asyncio
-    async def test_anonymous_submit_returns_401(
-        self, bare_client: AsyncClient
-    ) -> None:
+    async def test_anonymous_submit_returns_401(self, bare_client: AsyncClient) -> None:
         """匿名用户提交回测 → HTTP 401 + code:1001。"""
         resp = await bare_client.post(
             "/api/v1/admin/backtests",
@@ -440,27 +424,21 @@ class TestAdminBacktestGetAuth:
     """GET /api/v1/admin/backtests/{task_id} 权限测试。"""
 
     @pytest.mark.asyncio
-    async def test_non_admin_get_task_returns_403(
-        self, non_admin_client: AsyncClient
-    ) -> None:
+    async def test_non_admin_get_task_returns_403(self, non_admin_client: AsyncClient) -> None:
         """非管理员用户查询任务详情 → HTTP 403 + code:1002。"""
         resp = await non_admin_client.get("/api/v1/admin/backtests/1")
         assert resp.status_code == 403
         assert resp.json()["code"] == 1002
 
     @pytest.mark.asyncio
-    async def test_anonymous_get_task_returns_401(
-        self, bare_client: AsyncClient
-    ) -> None:
+    async def test_anonymous_get_task_returns_401(self, bare_client: AsyncClient) -> None:
         """匿名用户查询任务详情 → HTTP 401 + code:1001。"""
         resp = await bare_client.get("/api/v1/admin/backtests/1")
         assert resp.status_code == 401
         assert resp.json()["code"] == 1001
 
     @pytest.mark.asyncio
-    async def test_completed_task_returns_result_summary(
-        self, admin_client: AsyncClient
-    ) -> None:
+    async def test_completed_task_returns_result_summary(self, admin_client: AsyncClient) -> None:
         """COMPLETED 任务详情 → 包含 result_summary 数据。"""
         mock_task = _make_mock_task(id=5, status=TaskStatus.DONE)
         mock_task.result_json = {
@@ -490,9 +468,7 @@ class TestAdminBacktestGetAuth:
         assert summary["win_rate"] == 0.62
 
     @pytest.mark.asyncio
-    async def test_failed_task_returns_error_message(
-        self, admin_client: AsyncClient
-    ) -> None:
+    async def test_failed_task_returns_error_message(self, admin_client: AsyncClient) -> None:
         """FAILED 任务详情 → 包含 error_message，result_summary 为 None。"""
         mock_task = _make_mock_task(id=7, status=TaskStatus.FAILED)
         mock_task.error_message = "freqtrade subprocess exited with code 1"
@@ -513,9 +489,7 @@ class TestAdminBacktestGetAuth:
         assert body["data"]["result_summary"] is None
 
     @pytest.mark.asyncio
-    async def test_pending_task_returns_no_result(
-        self, admin_client: AsyncClient
-    ) -> None:
+    async def test_pending_task_returns_no_result(self, admin_client: AsyncClient) -> None:
         """PENDING 任务详情 → result_summary 和 error_message 均为 None。"""
         mock_task = _make_mock_task(id=3, status=TaskStatus.PENDING)
         mock_task.result_json = None
@@ -539,27 +513,21 @@ class TestAdminBacktestListAuth:
     """GET /api/v1/admin/backtests 权限与筛选测试。"""
 
     @pytest.mark.asyncio
-    async def test_non_admin_list_returns_403(
-        self, non_admin_client: AsyncClient
-    ) -> None:
+    async def test_non_admin_list_returns_403(self, non_admin_client: AsyncClient) -> None:
         """非管理员用户访问任务列表 → HTTP 403 + code:1002。"""
         resp = await non_admin_client.get("/api/v1/admin/backtests")
         assert resp.status_code == 403
         assert resp.json()["code"] == 1002
 
     @pytest.mark.asyncio
-    async def test_anonymous_list_returns_401(
-        self, bare_client: AsyncClient
-    ) -> None:
+    async def test_anonymous_list_returns_401(self, bare_client: AsyncClient) -> None:
         """匿名用户访问任务列表 → HTTP 401 + code:1001。"""
         resp = await bare_client.get("/api/v1/admin/backtests")
         assert resp.status_code == 401
         assert resp.json()["code"] == 1001
 
     @pytest.mark.asyncio
-    async def test_strategy_name_filter_passed_to_service(
-        self, admin_client: AsyncClient
-    ) -> None:
+    async def test_strategy_name_filter_passed_to_service(self, admin_client: AsyncClient) -> None:
         """strategy_name 筛选参数被正确传递至 service 层。"""
         with patch(
             "src.services.admin_backtest_service.AdminBacktestService.list_tasks",
@@ -575,13 +543,12 @@ class TestAdminBacktestListAuth:
         mock_list.assert_called_once()
         call_kwargs = mock_list.call_args
         # 确认 strategy_name 参数被传递
-        assert call_kwargs.kwargs.get("strategy_name") == "BollingerBands" or \
-            (len(call_kwargs.args) > 0 and "BollingerBands" in str(call_kwargs))
+        assert call_kwargs.kwargs.get("strategy_name") == "BollingerBands" or (
+            len(call_kwargs.args) > 0 and "BollingerBands" in str(call_kwargs)
+        )
 
     @pytest.mark.asyncio
-    async def test_status_filter_passed_to_service(
-        self, admin_client: AsyncClient
-    ) -> None:
+    async def test_status_filter_passed_to_service(self, admin_client: AsyncClient) -> None:
         """status 筛选参数被正确传递至 service 层。"""
         with patch(
             "src.services.admin_backtest_service.AdminBacktestService.list_tasks",
@@ -596,13 +563,12 @@ class TestAdminBacktestListAuth:
         assert resp.status_code == 200
         mock_list.assert_called_once()
         call_kwargs = mock_list.call_args
-        assert call_kwargs.kwargs.get("status") == "completed" or \
-            (len(call_kwargs.args) > 0 and "completed" in str(call_kwargs))
+        assert call_kwargs.kwargs.get("status") == "completed" or (
+            len(call_kwargs.args) > 0 and "completed" in str(call_kwargs)
+        )
 
     @pytest.mark.asyncio
-    async def test_page_size_exceeds_limit_returns_422(
-        self, admin_client: AsyncClient
-    ) -> None:
+    async def test_page_size_exceeds_limit_returns_422(self, admin_client: AsyncClient) -> None:
         """page_size=200（超过 100 上限）→ HTTP 422。"""
         resp = await admin_client.get(
             "/api/v1/admin/backtests",
@@ -611,9 +577,7 @@ class TestAdminBacktestListAuth:
         assert resp.status_code == 422
 
     @pytest.mark.asyncio
-    async def test_page_zero_returns_422(
-        self, admin_client: AsyncClient
-    ) -> None:
+    async def test_page_zero_returns_422(self, admin_client: AsyncClient) -> None:
         """page=0（小于最小值 1）→ HTTP 422。"""
         resp = await admin_client.get(
             "/api/v1/admin/backtests",
@@ -622,9 +586,7 @@ class TestAdminBacktestListAuth:
         assert resp.status_code == 422
 
     @pytest.mark.asyncio
-    async def test_empty_result_returns_valid_pagination(
-        self, admin_client: AsyncClient
-    ) -> None:
+    async def test_empty_result_returns_valid_pagination(self, admin_client: AsyncClient) -> None:
         """空结果集返回合法的分页结构（items=[], total=0）。"""
         with patch(
             "src.services.admin_backtest_service.AdminBacktestService.list_tasks",

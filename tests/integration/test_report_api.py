@@ -45,9 +45,7 @@ def app(env_setup):
 @pytest.fixture()
 async def client(app) -> AsyncGenerator[AsyncClient, None]:
     """提供绑定测试应用的异步 HTTP 客户端。"""
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as ac:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         yield ac
 
 
@@ -89,9 +87,7 @@ class TestReportListEndpoint:
     """GET /api/v1/reports 接口测试。"""
 
     @pytest.mark.asyncio
-    async def test_anonymous_can_access_reports_list(
-        self, client: AsyncClient, app
-    ) -> None:
+    async def test_anonymous_can_access_reports_list(self, client: AsyncClient, app) -> None:
         """匿名用户可以访问研报列表（无需 Authorization header）。"""
         from src.core.deps import get_db
 
@@ -118,9 +114,7 @@ class TestReportListEndpoint:
         assert "items" in body["data"]
 
     @pytest.mark.asyncio
-    async def test_reports_list_returns_paginated_response(
-        self, client: AsyncClient, app
-    ) -> None:
+    async def test_reports_list_returns_paginated_response(self, client: AsyncClient, app) -> None:
         """研报列表接口返回正确分页结构。"""
         from src.core.deps import get_db
 
@@ -153,9 +147,7 @@ class TestReportListEndpoint:
         assert len(data["items"]) == 2
 
     @pytest.mark.asyncio
-    async def test_reports_list_contains_summary_fields(
-        self, client: AsyncClient, app
-    ) -> None:
+    async def test_reports_list_contains_summary_fields(self, client: AsyncClient, app) -> None:
         """研报列表包含 id, title, summary, generated_at, related_coins 字段。"""
         from src.core.deps import get_db
 
@@ -187,9 +179,7 @@ class TestReportListEndpoint:
         assert "content" not in item
 
     @pytest.mark.asyncio
-    async def test_reports_list_related_coins_in_response(
-        self, client: AsyncClient, app
-    ) -> None:
+    async def test_reports_list_related_coins_in_response(self, client: AsyncClient, app) -> None:
         """研报列表响应包含关联币种列表。"""
         from src.core.deps import get_db
 
@@ -215,9 +205,7 @@ class TestReportListEndpoint:
         assert set(item["related_coins"]) == {"BTC", "ETH", "SOL"}
 
     @pytest.mark.asyncio
-    async def test_reports_list_default_page_size_is_20(
-        self, client: AsyncClient, app
-    ) -> None:
+    async def test_reports_list_default_page_size_is_20(self, client: AsyncClient, app) -> None:
         """研报列表接口默认 page_size=20。"""
         from src.core.deps import get_db
 
@@ -246,9 +234,7 @@ class TestReportDetailEndpoint:
     """GET /api/v1/reports/{id} 详情接口测试。"""
 
     @pytest.mark.asyncio
-    async def test_anonymous_can_access_report_detail(
-        self, client: AsyncClient, app
-    ) -> None:
+    async def test_anonymous_can_access_report_detail(self, client: AsyncClient, app) -> None:
         """匿名用户可以访问研报详情（无需 Authorization header）。"""
         from src.core.deps import get_db
 
@@ -274,9 +260,7 @@ class TestReportDetailEndpoint:
         assert body["code"] == 0
 
     @pytest.mark.asyncio
-    async def test_report_detail_contains_full_content(
-        self, client: AsyncClient, app
-    ) -> None:
+    async def test_report_detail_contains_full_content(self, client: AsyncClient, app) -> None:
         """研报详情包含完整 content 字段。"""
         from src.core.deps import get_db
 
@@ -308,9 +292,7 @@ class TestReportDetailEndpoint:
         assert "related_coins" in data
 
     @pytest.mark.asyncio
-    async def test_report_not_found_returns_404_with_code_3001(
-        self, client: AsyncClient, app
-    ) -> None:
+    async def test_report_not_found_returns_404_with_code_3001(self, client: AsyncClient, app) -> None:
         """研报不存在时返回 HTTP 404，code=3001。"""
         from src.core.deps import get_db
         from src.core.exceptions import NotFoundError
@@ -336,9 +318,7 @@ class TestReportDetailEndpoint:
         assert body["code"] == 3001
 
     @pytest.mark.asyncio
-    async def test_report_detail_related_coins_in_response(
-        self, client: AsyncClient, app
-    ) -> None:
+    async def test_report_detail_related_coins_in_response(self, client: AsyncClient, app) -> None:
         """研报详情包含关联币种列表。"""
         from src.core.deps import get_db
 
@@ -373,9 +353,7 @@ class TestReportTask8:
     """任务 8.1：补充研报接口统一信封格式与分页结构显式验证用例。"""
 
     @pytest.mark.asyncio
-    async def test_anonymous_list_access_returns_200_with_code_0(
-        self, client: AsyncClient, app
-    ) -> None:
+    async def test_anonymous_list_access_returns_200_with_code_0(self, client: AsyncClient, app) -> None:
         """匿名用户（无 Authorization header）访问研报列表 → HTTP 200 + code:0。
 
         需求 5.1：匿名用户可访问研报列表，无需认证。
@@ -404,9 +382,7 @@ class TestReportTask8:
         assert body["code"] == 0
 
     @pytest.mark.asyncio
-    async def test_anonymous_detail_access_returns_full_content(
-        self, client: AsyncClient, app
-    ) -> None:
+    async def test_anonymous_detail_access_returns_full_content(self, client: AsyncClient, app) -> None:
         """匿名用户访问研报详情 → 返回完整内容（含 content 字段），无需登录。
 
         需求 5.2：研报详情接口无需认证，返回完整研报内容。
@@ -438,9 +414,7 @@ class TestReportTask8:
         assert body["data"]["content"] == "完整市场分析：详细数据与趋势预测。"
 
     @pytest.mark.asyncio
-    async def test_nonexistent_report_id_returns_404_not_500(
-        self, client: AsyncClient, app
-    ) -> None:
+    async def test_nonexistent_report_id_returns_404_not_500(self, client: AsyncClient, app) -> None:
         """请求不存在的研报 ID → HTTP 404 + 业务错误码，而非 HTTP 500。
 
         需求 5.3：不存在的研报 ID 返回适当错误码（非 500），HTTP 状态码为 404。
@@ -471,9 +445,7 @@ class TestReportTask8:
         assert body["code"] == 3001
 
     @pytest.mark.asyncio
-    async def test_pagination_structure_has_required_fields(
-        self, client: AsyncClient, app
-    ) -> None:
+    async def test_pagination_structure_has_required_fields(self, client: AsyncClient, app) -> None:
         """研报列表响应 data 包含 items、total、page、page_size 四个字段。
 
         需求 5.4：研报列表接口返回标准分页结构，与其他列表接口保持一致。
@@ -511,9 +483,7 @@ class TestReportTask8:
         assert len(data["items"]) == 3
 
     @pytest.mark.asyncio
-    async def test_envelope_format_has_code_message_data_fields(
-        self, client: AsyncClient, app
-    ) -> None:
+    async def test_envelope_format_has_code_message_data_fields(self, client: AsyncClient, app) -> None:
         """研报接口响应体包含 code、message、data 三个字段。
 
         需求 5.5：研报接口响应符合统一信封格式（code、message、data 三字段齐全）。
@@ -555,33 +525,25 @@ class TestReportListValidation:
     """GET /api/v1/reports 输入验证测试。"""
 
     @pytest.mark.asyncio
-    async def test_page_size_exceeds_limit_returns_422(
-        self, client: AsyncClient
-    ) -> None:
+    async def test_page_size_exceeds_limit_returns_422(self, client: AsyncClient) -> None:
         """page_size=200（超过 100 上限）→ HTTP 422。"""
         resp = await client.get("/api/v1/reports", params={"page_size": 200})
         assert resp.status_code == 422
 
     @pytest.mark.asyncio
-    async def test_page_zero_returns_422(
-        self, client: AsyncClient
-    ) -> None:
+    async def test_page_zero_returns_422(self, client: AsyncClient) -> None:
         """page=0（小于最小值 1）→ HTTP 422。"""
         resp = await client.get("/api/v1/reports", params={"page": 0})
         assert resp.status_code == 422
 
     @pytest.mark.asyncio
-    async def test_page_size_zero_returns_422(
-        self, client: AsyncClient
-    ) -> None:
+    async def test_page_size_zero_returns_422(self, client: AsyncClient) -> None:
         """page_size=0（小于最小值 1）→ HTTP 422。"""
         resp = await client.get("/api/v1/reports", params={"page_size": 0})
         assert resp.status_code == 422
 
     @pytest.mark.asyncio
-    async def test_negative_page_returns_422(
-        self, client: AsyncClient
-    ) -> None:
+    async def test_negative_page_returns_422(self, client: AsyncClient) -> None:
         """page=-1（负数）→ HTTP 422。"""
         resp = await client.get("/api/v1/reports", params={"page": -1})
         assert resp.status_code == 422
@@ -591,25 +553,19 @@ class TestReportDetailValidation:
     """GET /api/v1/reports/{id} 输入验证测试。"""
 
     @pytest.mark.asyncio
-    async def test_non_integer_report_id_returns_422(
-        self, client: AsyncClient
-    ) -> None:
+    async def test_non_integer_report_id_returns_422(self, client: AsyncClient) -> None:
         """非整数 report_id（如 "abc"）→ HTTP 422。"""
         resp = await client.get("/api/v1/reports/abc")
         assert resp.status_code == 422
 
     @pytest.mark.asyncio
-    async def test_float_report_id_returns_422(
-        self, client: AsyncClient
-    ) -> None:
+    async def test_float_report_id_returns_422(self, client: AsyncClient) -> None:
         """浮点数 report_id（如 "1.5"）→ HTTP 422。"""
         resp = await client.get("/api/v1/reports/1.5")
         assert resp.status_code == 422
 
     @pytest.mark.asyncio
-    async def test_logged_in_user_can_access_report_detail(
-        self, client: AsyncClient, app
-    ) -> None:
+    async def test_logged_in_user_can_access_report_detail(self, client: AsyncClient, app) -> None:
         """已登录用户访问研报详情 → 正常返回 200（不因多余的 token 报错）。"""
         from src.core.deps import get_db
 
@@ -639,9 +595,7 @@ class TestReportDetailValidation:
         assert response.json()["code"] == 0
 
     @pytest.mark.asyncio
-    async def test_logged_in_user_can_access_report_list(
-        self, client: AsyncClient, app
-    ) -> None:
+    async def test_logged_in_user_can_access_report_list(self, client: AsyncClient, app) -> None:
         """已登录用户访问研报列表 → 正常返回 200。"""
         from src.core.deps import get_db
 

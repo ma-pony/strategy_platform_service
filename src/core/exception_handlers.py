@@ -71,9 +71,7 @@ def _sanitize_errors(errors: Any) -> list[dict[str, object]]:
     return sanitized
 
 
-async def validation_exception_handler(
-    request: Request, exc: RequestValidationError
-) -> JSONResponse:
+async def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
     """将 Pydantic 422 校验错误转换为统一信封格式。
 
     返回 code:2001，HTTP 状态码保持 422。
@@ -115,9 +113,7 @@ async def app_error_handler(request: Request, exc: AppError) -> JSONResponse:
     )
 
 
-async def generic_exception_handler(
-    request: Request, exc: Exception
-) -> JSONResponse:
+async def generic_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     """兜底处理未捕获异常，返回 code:5000 HTTP 500。
 
     不向客户端暴露原始 traceback 或内部路径信息。

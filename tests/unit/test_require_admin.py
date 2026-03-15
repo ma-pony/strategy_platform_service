@@ -1,7 +1,6 @@
 """require_admin 依赖注入单元测试（任务 10.2）。"""
 
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, patch
 
 import pytest
 

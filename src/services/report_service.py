@@ -18,7 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from src.core.exceptions import NotFoundError
-from src.models.report import ReportCoin, ResearchReport
+from src.models.report import ResearchReport
 
 
 class ReportService:
@@ -87,11 +87,7 @@ class ReportService:
         Raises:
             NotFoundError: 研报不存在（code=3001）
         """
-        stmt = (
-            select(ResearchReport)
-            .options(selectinload(ResearchReport.coins))
-            .where(ResearchReport.id == report_id)
-        )
+        stmt = select(ResearchReport).options(selectinload(ResearchReport.coins)).where(ResearchReport.id == report_id)
         result = await db.execute(stmt)
         report = result.scalar_one_or_none()
 

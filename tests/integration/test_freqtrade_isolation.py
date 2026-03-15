@@ -46,9 +46,7 @@ def app(env_setup):
 @pytest.fixture()
 async def client(app) -> AsyncGenerator[AsyncClient, None]:
     """提供绑定测试应用的异步 HTTP 客户端。"""
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as ac:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         yield ac
 
 
@@ -98,16 +96,13 @@ class TestFreqtradeWorkerIsolation:
     非回测接口（策略查询、研报读取）应继续正常服务。
     """
 
-    async def test_strategy_endpoint_returns_200_when_worker_unavailable(
-        self, client: AsyncClient, app
-    ) -> None:
+    async def test_strategy_endpoint_returns_200_when_worker_unavailable(self, client: AsyncClient, app) -> None:
         """策略列表接口在 Worker 不可用时仍返回 HTTP 200 + code:0。
 
         patch Celery worker inspect 返回 None 模拟 Worker 不可用，
         验证策略接口不依赖 freqtrade Worker 状态。
         """
         from src.core.deps import get_db
-        from src.services.strategy_service import StrategyService
 
         mock_strategy = _make_mock_strategy()
         mock_db_session = AsyncMock()
@@ -135,9 +130,7 @@ class TestFreqtradeWorkerIsolation:
         body = response.json()
         assert body["code"] == 0
 
-    async def test_report_endpoint_returns_200_when_worker_unavailable(
-        self, client: AsyncClient, app
-    ) -> None:
+    async def test_report_endpoint_returns_200_when_worker_unavailable(self, client: AsyncClient, app) -> None:
         """研报列表接口在 Worker 不可用时仍返回 HTTP 200。
 
         patch Celery worker inspect 返回 None 模拟 Worker 不可用，
@@ -154,9 +147,7 @@ class TestFreqtradeWorkerIsolation:
         # 为列表查询和 count 查询分别配置返回值
         count_result = MagicMock()
         count_result.scalar_one.return_value = 1
-        mock_db_session.execute = AsyncMock(
-            side_effect=[count_result, mock_result]
-        )
+        mock_db_session.execute = AsyncMock(side_effect=[count_result, mock_result])
 
         # 模拟 Worker 不可用：Celery inspect 返回 None
         with patch(
@@ -176,9 +167,7 @@ class TestFreqtradeWorkerIsolation:
 
         assert response.status_code == 200
 
-    async def test_strategy_endpoint_independent_of_freqtrade_subprocess(
-        self, client: AsyncClient, app
-    ) -> None:
+    async def test_strategy_endpoint_independent_of_freqtrade_subprocess(self, client: AsyncClient, app) -> None:
         """验证策略接口不依赖 freqtrade 子进程，即使 subprocess.run 被 patch 为失败。
 
         当 freqtrade 子进程调用失败时，策略读取接口不应受影响。
@@ -191,7 +180,6 @@ class TestFreqtradeWorkerIsolation:
         mock_result.scalars.return_value.all.return_value = [mock_strategy]
         mock_db_session.execute = AsyncMock(return_value=mock_result)
 
-        import subprocess
 
         # 模拟 freqtrade 子进程不可用
         with patch(

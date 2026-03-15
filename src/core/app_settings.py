@@ -45,7 +45,7 @@ class AppSettings(BaseSettings):
     signal_refresh_interval: int = 5  # 信号刷新周期（分钟），默认 5 分钟
 
     # freqtrade 回测配置
-    freqtrade_datadir: str = "/tmp/freqtrade_data"  # OHLCV 数据目录
+    freqtrade_datadir: str = "/tmp/freqtrade_data"  # noqa: S108  # OHLCV 数据目录
 
 
 @lru_cache(maxsize=1)

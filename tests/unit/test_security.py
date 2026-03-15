@@ -11,7 +11,6 @@ import time
 
 import pytest
 
-
 # 测试用固定密钥（仅测试环境使用）
 TEST_SECRET = "test-secret-key-for-unit-tests-only-256bits"
 
@@ -91,9 +90,7 @@ class TestCreateRefreshToken:
         with pytest.raises(AuthenticationError):
             security.decode_token(token)
 
-    def test_refresh_token_can_be_decoded_with_type_check_disabled(
-        self, security
-    ) -> None:
+    def test_refresh_token_can_be_decoded_with_type_check_disabled(self, security) -> None:
         """refresh token 本身是合法 JWT，只是 type 字段为 refresh。"""
         token = security.create_refresh_token(sub="99")
         payload = security.decode_token(token, expected_type="refresh")
@@ -120,16 +117,15 @@ class TestDecodeToken:
         with pytest.raises(AuthenticationError):
             security.decode_token(tampered)
 
-    def test_expired_token_raises_authentication_error(
-        self, monkeypatch: pytest.MonkeyPatch, security
-    ) -> None:
+    def test_expired_token_raises_authentication_error(self, monkeypatch: pytest.MonkeyPatch, security) -> None:
         """past exp 时间的 token 应抛出 AuthenticationError。"""
-        from src.core.enums import MembershipTier
-        from src.core.exceptions import AuthenticationError
         from datetime import datetime, timedelta, timezone
 
         # 手动创建过期 token
         from jose import jwt
+
+        from src.core.enums import MembershipTier
+        from src.core.exceptions import AuthenticationError
 
         payload = {
             "sub": "1",
@@ -170,16 +166,12 @@ class TestPasswordUtils:
         hashed = security.hash_password(plain)
         assert hashed != plain
 
-    def test_verify_password_returns_true_for_correct_password(
-        self, security
-    ) -> None:
+    def test_verify_password_returns_true_for_correct_password(self, security) -> None:
         plain = "correct_password"
         hashed = security.hash_password(plain)
         assert security.verify_password(plain, hashed) is True
 
-    def test_verify_password_returns_false_for_wrong_password(
-        self, security
-    ) -> None:
+    def test_verify_password_returns_false_for_wrong_password(self, security) -> None:
         hashed = security.hash_password("correct_password")
         assert security.verify_password("wrong_password", hashed) is False
 

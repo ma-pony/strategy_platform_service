@@ -15,15 +15,16 @@ from unittest.mock import MagicMock, patch
 import pandas as pd
 import pytest
 
-
 # ─────────────────────────────────────────────
 # Fixtures
 # ─────────────────────────────────────────────
+
 
 @pytest.fixture()
 def mock_strategy_entry():
     """模拟策略注册表条目。"""
     from pathlib import Path
+
     return {
         "class_name": "TurtleTradingStrategy",
         "file_path": Path("/fake/turtle_trading.py"),
@@ -109,6 +110,7 @@ def patch_signal_fetcher_internals(mock_strategy_entry, signal_df):
 # Task 6.1: _fetch_signals_sync 返回 11 字段
 # ─────────────────────────────────────────────
 
+
 class TestFetchSignalsSyncImpl:
     """_fetch_signals_sync 实现测试。"""
 
@@ -127,9 +129,17 @@ class TestFetchSignalsSyncImpl:
 
         signal = signals[0]
         required_fields = [
-            "pair", "direction", "confidence_score", "entry_price",
-            "stop_loss", "take_profit", "indicator_values", "timeframe",
-            "signal_strength", "volume", "volatility",
+            "pair",
+            "direction",
+            "confidence_score",
+            "entry_price",
+            "stop_loss",
+            "take_profit",
+            "indicator_values",
+            "timeframe",
+            "signal_strength",
+            "volume",
+            "volatility",
         ]
         for field in required_fields:
             assert field in signal, f"缺少字段: {field}"
@@ -148,6 +158,7 @@ class TestFetchSignalsSyncImpl:
     def test_indicator_values_is_json_serializable_dict(self, sample_ohlcv_df, mock_strategy_entry) -> None:
         """indicator_values 为 JSON 可序列化的字典。"""
         import json
+
         from src.freqtrade_bridge.signal_fetcher import _fetch_signals_sync
 
         signal_df = make_signal_df(sample_ohlcv_df)
@@ -201,8 +212,8 @@ class TestFetchSignalsSyncImpl:
 
     def test_unsupported_strategy_raises_execution_error(self) -> None:
         """策略不在注册表时抛出 FreqtradeExecutionError。"""
-        from src.freqtrade_bridge.exceptions import FreqtradeExecutionError
         from src.core.exceptions import UnsupportedStrategyError
+        from src.freqtrade_bridge.exceptions import FreqtradeExecutionError
         from src.freqtrade_bridge.signal_fetcher import _fetch_signals_sync
 
         with patch(
@@ -236,6 +247,7 @@ class TestFetchSignalsSyncImpl:
 # Task 6.1: SIGNAL_MAX_WORKERS 环境变量配置
 # ─────────────────────────────────────────────
 
+
 class TestSignalMaxWorkers:
     """SIGNAL_MAX_WORKERS 环境变量配置测试。"""
 
@@ -245,7 +257,9 @@ class TestSignalMaxWorkers:
 
         # 重新加载模块以应用环境变量变更
         import importlib
+
         import src.freqtrade_bridge.signal_fetcher as sf_module
+
         importlib.reload(sf_module)
 
         assert sf_module._executor._max_workers == 2
@@ -255,7 +269,9 @@ class TestSignalMaxWorkers:
         monkeypatch.setenv("SIGNAL_MAX_WORKERS", "4")
 
         import importlib
+
         import src.freqtrade_bridge.signal_fetcher as sf_module
+
         importlib.reload(sf_module)
 
         assert sf_module._executor._max_workers == 4
@@ -269,33 +285,39 @@ class TestSignalMaxWorkers:
 # Task 6.1: helper 函数存在性验证
 # ─────────────────────────────────────────────
 
+
 class TestSignalFetcherHelpers:
     """signal_fetcher 内部 helper 函数存在性测试。"""
 
     def test_lookup_strategy_helper_exists(self) -> None:
         """_lookup_strategy helper 函数应存在。"""
         from src.freqtrade_bridge import signal_fetcher
+
         assert hasattr(signal_fetcher, "_lookup_strategy")
 
     def test_build_ohlcv_dataframe_helper_exists(self) -> None:
         """_build_ohlcv_dataframe helper 函数应存在。"""
         from src.freqtrade_bridge import signal_fetcher
+
         assert hasattr(signal_fetcher, "_build_ohlcv_dataframe")
 
     def test_run_strategy_on_df_helper_exists(self) -> None:
         """_run_strategy_on_df helper 函数应存在。"""
         from src.freqtrade_bridge import signal_fetcher
+
         assert hasattr(signal_fetcher, "_run_strategy_on_df")
 
     def test_load_strategy_class_helper_exists(self) -> None:
         """_load_strategy_class helper 函数应存在。"""
         from src.freqtrade_bridge import signal_fetcher
+
         assert hasattr(signal_fetcher, "_load_strategy_class")
 
 
 # ─────────────────────────────────────────────
 # 做空信号方向检测
 # ─────────────────────────────────────────────
+
 
 class TestShortSignalDirection:
     """enter_short / exit_short 方向检测测试。"""
@@ -348,6 +370,7 @@ class TestShortSignalDirection:
 # ─────────────────────────────────────────────
 # 止损止盈方向正确性
 # ─────────────────────────────────────────────
+
 
 class TestStopLossTakeProfitDirection:
     """止损止盈随方向变化的正确性测试。"""
@@ -406,8 +429,8 @@ class TestStopLossTakeProfitDirection:
 
     def test_sell_fallback_stop_loss_when_no_atr(self, sample_ohlcv_df, mock_strategy_entry) -> None:
         """sell 方向无 ATR 时 stop_loss = entry * 1.03（上方 3%）。"""
+
         from src.freqtrade_bridge.signal_fetcher import _fetch_signals_sync
-        import math
 
         signal_df = make_signal_df(sample_ohlcv_df, enter_short=1, atr=float("nan"))
         with patch_signal_fetcher_internals(mock_strategy_entry, signal_df):
@@ -422,6 +445,7 @@ class TestStopLossTakeProfitDirection:
 # ─────────────────────────────────────────────
 # 置信度与信号强度计算
 # ─────────────────────────────────────────────
+
 
 class TestConfidenceAndStrength:
     """confidence_score 和 signal_strength 值正确性测试。"""

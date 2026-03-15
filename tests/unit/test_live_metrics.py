@@ -22,6 +22,7 @@ def env_setup(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("REDIS_URL", "redis://localhost:6379/0")
 
     from src.core import app_settings
+
     app_settings.get_settings.cache_clear()
     yield
     app_settings.get_settings.cache_clear()
@@ -65,10 +66,7 @@ class TestComputeLiveMetricsInsufficientData:
 
         mock_session = MagicMock()
         # 返回 4 条信号
-        mock_signals = [
-            MagicMock(direction="buy", confidence_score=0.7)
-            for _ in range(4)
-        ]
+        mock_signals = [MagicMock(direction="buy", confidence_score=0.7) for _ in range(4)]
         mock_session.execute.return_value.fetchall.return_value = mock_signals
 
         result = compute_live_metrics(
@@ -86,10 +84,7 @@ class TestComputeLiveMetricsInsufficientData:
         from src.workers.tasks.signal_tasks import compute_live_metrics
 
         mock_session = MagicMock()
-        mock_signals = [
-            MagicMock(direction="buy", confidence_score=0.7)
-            for _ in range(5)
-        ]
+        mock_signals = [MagicMock(direction="buy", confidence_score=0.7) for _ in range(5)]
         mock_session.execute.return_value.fetchall.return_value = mock_signals
 
         result = compute_live_metrics(
@@ -188,10 +183,7 @@ class TestComputeLiveMetricsCalculation:
         from src.workers.tasks.signal_tasks import compute_live_metrics
 
         mock_session = MagicMock()
-        mock_signals = [
-            MagicMock(direction="buy", confidence_score=0.8)
-            for _ in range(10)
-        ]
+        mock_signals = [MagicMock(direction="buy", confidence_score=0.8) for _ in range(10)]
         mock_session.execute.return_value.fetchall.return_value = mock_signals
 
         result = compute_live_metrics(
@@ -201,9 +193,7 @@ class TestComputeLiveMetricsCalculation:
             timeframe="1h",
         )
 
-        assert set(result.keys()) >= {
-            "total_return", "profit_factor", "max_drawdown", "sharpe_ratio", "trade_count"
-        }
+        assert set(result.keys()) >= {"total_return", "profit_factor", "max_drawdown", "sharpe_ratio", "trade_count"}
 
 
 class TestTryUpsertLiveMetrics:
@@ -216,7 +206,9 @@ class TestTryUpsertLiveMetrics:
         with (
             patch(
                 "src.workers.tasks.signal_tasks.SyncSessionLocal",
-                return_value=MagicMock(__enter__=MagicMock(return_value=MagicMock()), __exit__=MagicMock(return_value=False)),
+                return_value=MagicMock(
+                    __enter__=MagicMock(return_value=MagicMock()), __exit__=MagicMock(return_value=False)
+                ),
             ),
             patch(
                 "src.workers.tasks.signal_tasks.compute_live_metrics",
@@ -249,7 +241,9 @@ class TestTryUpsertLiveMetrics:
         with (
             patch(
                 "src.workers.tasks.signal_tasks.SyncSessionLocal",
-                return_value=MagicMock(__enter__=MagicMock(return_value=MagicMock()), __exit__=MagicMock(return_value=False)),
+                return_value=MagicMock(
+                    __enter__=MagicMock(return_value=MagicMock()), __exit__=MagicMock(return_value=False)
+                ),
             ),
             patch(
                 "src.workers.tasks.signal_tasks.compute_live_metrics",
@@ -296,9 +290,7 @@ class TestTryUpsertLiveMetrics:
                 "src.workers.tasks.signal_tasks.compute_live_metrics",
                 return_value=mock_metrics,
             ),
-            patch(
-                "src.workers.tasks.signal_tasks.upsert_pair_metrics"
-            ) as mock_upsert,
+            patch("src.workers.tasks.signal_tasks.upsert_pair_metrics") as mock_upsert,
         ):
             try_upsert_live_metrics(
                 strategy_id=1,
@@ -352,7 +344,9 @@ class TestTryUpsertLiveMetrics:
         with (
             patch(
                 "src.workers.tasks.signal_tasks.SyncSessionLocal",
-                return_value=MagicMock(__enter__=MagicMock(return_value=MagicMock()), __exit__=MagicMock(return_value=False)),
+                return_value=MagicMock(
+                    __enter__=MagicMock(return_value=MagicMock()), __exit__=MagicMock(return_value=False)
+                ),
             ),
             patch(
                 "src.workers.tasks.signal_tasks.compute_live_metrics",

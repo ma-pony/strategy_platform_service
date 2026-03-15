@@ -34,6 +34,7 @@ dev = [
 ]
 
 [tool.coverage.run]
+branch = true
 omit = [
     "src/freqtrade_bridge/strategies/*",
     "src/freqtrade_bridge/seeds/*",
@@ -41,10 +42,76 @@ omit = [
 
 [tool.ruff]
 target-version = "py311"
-line-length = 88
+line-length = 120
 
 [tool.ruff.lint]
-select = ["E", "F", "I"]
+select = [
+    "E",     # pycodestyle errors
+    "W",     # pycodestyle warnings
+    "F",     # pyflakes
+    "I",     # isort
+    "C",     # flake8-comprehensions
+    "B",     # flake8-bugbear
+    "T20",   # flake8-print
+    "ASYNC", # flake8-async
+    "UP",    # pyupgrade
+    "RET",   # flake8-return
+    "SIM",   # flake8-simplify
+    "PERF",  # perflint
+    "PIE",   # flake8-pie
+    "RSE",   # flake8-raise
+    "RUF",   # ruff-specific
+    "DTZ",   # flake8-datetimez
+    "TID",   # flake8-tidy-imports
+    "PT",    # flake8-pytest-style
+    "TCH",   # flake8-type-checking
+    "S",     # flake8-bandit (security)
+    "N",     # pep8-naming
+]
+ignore = [
+    "S101",   # assert 允许（测试中广泛使用）
+    "S301",   # pickle 允许
+    "S105",   # hardcoded password 误报（配置默认值）
+    "S106",   # hardcoded password 误报
+    "S110",   # try-except-pass 允许（非阻塞异常处理）
+    "RUF001", # ambiguous unicode（中文注释/文档字符串）
+    "RUF002", # ambiguous unicode（中文注释/文档字符串）
+    "RUF003", # ambiguous unicode（中文注释/文档字符串）
+    "RUF012", # ClassVar 注解（与 SQLAlchemy/sqladmin 冲突）
+    "PT011",  # pytest.raises match 参数非必需
+    "PT001",  # pytest.fixture 无需括号
+    "UP007",  # X | Y 类型联合语法（兼容 3.11）
+    "UP017",  # UTC alias（兼容 3.11）
+    "SIM108", # 三元表达式替代 if-else（可读性优先）
+    "SIM117", # 多个 with 语句合并（可读性优先）
+    "C901",   # 函数复杂度（部分业务逻辑必要）
+    "B008",   # function call in default arg（FastAPI Depends 常见模式）
+    "RET504", # unnecessary variable before return（可读性优先）
+    "RUF015", # unnecessary iterable allocation（可读性优先）
+    "DTZ011", # datetime without tz（内部使用 UTC）
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["src"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = [
+    "S",      # 测试中无需安全检查
+    "T20",    # 测试中允许 print
+    "TCH",    # 测试中无需 TYPE_CHECKING
+]
+"src/freqtrade_bridge/seeds/**/*.py" = [
+    "T20",    # 种子脚本允许 print
+    "S608",   # SQL 拼接（清理数据时使用）
+]
+"src/freqtrade_bridge/strategies/**/*.py" = [
+    "N802",   # freqtrade 策略方法命名不遵循 PEP8
+    "N803",   # freqtrade 参数命名
+    "RUF012", # freqtrade 策略类属性
+]
+"migrations/**/*.py" = [
+    "T20",    # 迁移脚本允许 print
+]
 
 [tool.pyright]
 pythonVersion = "3.11"
@@ -57,7 +124,7 @@ ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "--cov=src --cov-report=term-missing --cov-fail-under=75"
+addopts = "--cov=src --cov-report=term-missing --cov-fail-under=70 --cov-branch"
 python_files = "test_*.py"
 python_functions = "test_*"
 asyncio_mode = "auto"

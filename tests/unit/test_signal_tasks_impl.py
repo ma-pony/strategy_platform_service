@@ -8,7 +8,7 @@
   - SIGNAL_REFRESH_INTERVAL 配置刷新周期（默认 5 分钟）
 """
 
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -22,6 +22,7 @@ def env_setup(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("REDIS_URL", "redis://localhost:6379/0")
 
     from src.core import app_settings
+
     app_settings.get_settings.cache_clear()
     yield
     app_settings.get_settings.cache_clear()
@@ -54,6 +55,7 @@ def full_signals_data():
 # ─────────────────────────────────────────────
 # Task 6.2: INSERT 含 signal_source='realtime' 及 11 个扩展字段
 # ─────────────────────────────────────────────
+
 
 class TestPersistSignalsWithAllFields:
     """_persist_signals_to_db 写入完整 11 字段测试。"""
@@ -147,6 +149,7 @@ class TestPersistSignalsWithAllFields:
 # Task 6.2: 失败时结构化错误日志
 # ─────────────────────────────────────────────
 
+
 class TestGenerateSignalsTaskErrorLogging:
     """generate_signals_task 失败时结构化错误日志测试。"""
 
@@ -231,12 +234,11 @@ class TestGenerateSignalsTaskErrorLogging:
 # Task 6.2: 成功时结构化 info 日志
 # ─────────────────────────────────────────────
 
+
 class TestGenerateSignalsTaskInfoLogging:
     """generate_signals_task 成功时结构化 info 日志测试。"""
 
-    def test_success_logs_info_with_strategy_pair_direction_source_duration(
-        self, env_setup, full_signals_data
-    ) -> None:
+    def test_success_logs_info_with_strategy_pair_direction_source_duration(self, env_setup, full_signals_data) -> None:
         """信号生成成功时记录结构化 info 日志（策略名、交易对、信号类型、来源、执行耗时）。"""
         from src.workers.tasks.signal_tasks import generate_signals_task
 
@@ -297,10 +299,7 @@ class TestGenerateSignalsTaskInfoLogging:
                         generate_signals_task(strategy_id=1, pair="BTC/USDT")
 
         # 检查日志中包含 duration 相关字段
-        duration_logs = [
-            c for c in info_calls
-            if any(k in c for k in ["duration_ms", "elapsed_ms", "execution_time"])
-        ]
+        duration_logs = [c for c in info_calls if any(k in c for k in ["duration_ms", "elapsed_ms", "execution_time"])]
         assert len(duration_logs) >= 1
 
 
@@ -308,30 +307,33 @@ class TestGenerateSignalsTaskInfoLogging:
 # Task 6.2: SIGNAL_REFRESH_INTERVAL 配置
 # ─────────────────────────────────────────────
 
+
 class TestSignalRefreshInterval:
     """SIGNAL_REFRESH_INTERVAL 配置测试。"""
 
     def test_app_settings_has_signal_refresh_interval(self, env_setup) -> None:
         """AppSettings 应包含 signal_refresh_interval 字段。"""
         from src.core.app_settings import AppSettings
+
         assert hasattr(AppSettings, "model_fields") or hasattr(AppSettings, "__fields__")
         from src.core.app_settings import get_settings
+
         settings = get_settings()
         assert hasattr(settings, "signal_refresh_interval")
 
     def test_signal_refresh_interval_default_is_5_minutes(self, env_setup) -> None:
         """signal_refresh_interval 默认值为 5（分钟）。"""
         from src.core.app_settings import get_settings
+
         settings = get_settings()
         assert settings.signal_refresh_interval == 5
 
-    def test_signal_refresh_interval_can_be_overridden_via_env(
-        self, env_setup, monkeypatch
-    ) -> None:
+    def test_signal_refresh_interval_can_be_overridden_via_env(self, env_setup, monkeypatch) -> None:
         """通过环境变量 SIGNAL_REFRESH_INTERVAL 可覆盖默认值。"""
         monkeypatch.setenv("SIGNAL_REFRESH_INTERVAL", "10")
 
         from src.core import app_settings
+
         app_settings.get_settings.cache_clear()
         settings = app_settings.get_settings()
         assert settings.signal_refresh_interval == 10
@@ -340,11 +342,13 @@ class TestSignalRefreshInterval:
     def test_app_settings_has_signal_max_workers(self, env_setup) -> None:
         """AppSettings 应包含 signal_max_workers 字段。"""
         from src.core.app_settings import get_settings
+
         settings = get_settings()
         assert hasattr(settings, "signal_max_workers")
 
     def test_signal_max_workers_default_is_2(self, env_setup) -> None:
         """signal_max_workers 默认值为 2。"""
         from src.core.app_settings import get_settings
+
         settings = get_settings()
         assert settings.signal_max_workers == 2

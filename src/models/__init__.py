@@ -13,14 +13,14 @@ from src.models.strategy_pair_metrics import StrategyPairMetrics
 from src.models.user import User
 
 __all__ = [
-    "Base",
-    "TimestampMixin",
-    "User",
-    "Strategy",
-    "BacktestTask",
     "BacktestResult",
-    "TradingSignal",
-    "ResearchReport",
+    "BacktestTask",
+    "Base",
     "ReportCoin",
+    "ResearchReport",
+    "Strategy",
     "StrategyPairMetrics",
+    "TimestampMixin",
+    "TradingSignal",
+    "User",
 ]

@@ -50,9 +50,7 @@ class TradingSignal(Base):
         nullable=False,
     )
     confidence_score: Mapped[float | None] = mapped_column(Float, nullable=True)
-    signal_source: Mapped[str] = mapped_column(
-        String(32), nullable=False, server_default="realtime"
-    )
+    signal_source: Mapped[str] = mapped_column(String(32), nullable=False, server_default="realtime")
     entry_price: Mapped[float | None] = mapped_column(Float, nullable=True)
     stop_loss: Mapped[float | None] = mapped_column(Float, nullable=True)
     take_profit: Mapped[float | None] = mapped_column(Float, nullable=True)
@@ -61,9 +59,7 @@ class TradingSignal(Base):
     signal_strength: Mapped[float | None] = mapped_column(Float, nullable=True)
     volume: Mapped[float | None] = mapped_column(Float, nullable=True)
     volatility: Mapped[float | None] = mapped_column(Float, nullable=True)
-    signal_at: Mapped[datetime.datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False
-    )
+    signal_at: Mapped[datetime.datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     created_at: Mapped[datetime.datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),

@@ -4,7 +4,6 @@
 以及 AppError 异常体系。
 """
 
-import pytest
 
 
 class TestApiResponse:
@@ -83,9 +82,7 @@ class TestPaginatedData:
     def test_paginated_data_model_fields(self) -> None:
         from src.core.response import PaginatedData
 
-        data: PaginatedData[str] = PaginatedData(
-            items=["a", "b"], total=2, page=1, page_size=20
-        )
+        data: PaginatedData[str] = PaginatedData(items=["a", "b"], total=2, page=1, page_size=20)
         assert data.items == ["a", "b"]
         assert data.total == 2
 

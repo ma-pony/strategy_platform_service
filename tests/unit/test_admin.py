@@ -42,9 +42,7 @@ class TestAdminAuth:
         )
 
         mock_request = MagicMock()
-        mock_request.form = AsyncMock(
-            return_value={"username": "admin", "password": "adminpass"}
-        )
+        mock_request.form = AsyncMock(return_value={"username": "admin", "password": "adminpass"})
         mock_request.session = {}
 
         result = await auth.login(mock_request)
@@ -62,9 +60,7 @@ class TestAdminAuth:
         )
 
         mock_request = MagicMock()
-        mock_request.form = AsyncMock(
-            return_value={"username": "admin", "password": "wrongpassword"}
-        )
+        mock_request.form = AsyncMock(return_value={"username": "admin", "password": "wrongpassword"})
         mock_request.session = {}
 
         result = await auth.login(mock_request)
@@ -82,9 +78,7 @@ class TestAdminAuth:
         )
 
         mock_request = MagicMock()
-        mock_request.form = AsyncMock(
-            return_value={"username": "wrongadmin", "password": "adminpass"}
-        )
+        mock_request.form = AsyncMock(return_value={"username": "wrongadmin", "password": "adminpass"})
         mock_request.session = {}
 
         result = await auth.login(mock_request)
@@ -102,9 +96,7 @@ class TestAdminAuth:
         )
 
         mock_request = MagicMock()
-        mock_request.form = AsyncMock(
-            return_value={"username": "admin", "password": "adminpass"}
-        )
+        mock_request.form = AsyncMock(return_value={"username": "admin", "password": "adminpass"})
         mock_request.session = {}
 
         await auth.login(mock_request)
@@ -275,7 +267,7 @@ class TestSetupAdmin:
 
     def test_setup_admin_registers_views_and_returns_none(self) -> None:
         """setup_admin 应成功注册视图，不抛出异常。"""
-        from unittest.mock import MagicMock, patch
+        from unittest.mock import MagicMock
 
         from fastapi import FastAPI
 
@@ -285,10 +277,10 @@ class TestSetupAdmin:
         mock_settings = MagicMock()
         mock_settings.secret_key = "test-secret-key"
 
-        with patch("src.admin.AdminAuth") as mock_auth_cls, patch(
-            "src.admin.Admin"
-        ) as mock_admin_cls, patch(
-            "src.core.app_settings.get_settings", return_value=mock_settings
+        with (
+            patch("src.admin.AdminAuth") as mock_auth_cls,
+            patch("src.admin.Admin") as mock_admin_cls,
+            patch("src.core.app_settings.get_settings", return_value=mock_settings),
         ):
             mock_auth_instance = MagicMock()
             mock_auth_cls.return_value = mock_auth_instance
@@ -302,5 +294,6 @@ class TestSetupAdmin:
 
             # 验证 Admin 实例被创建
             assert mock_admin_cls.called
-            # 验证 add_view 被调用七次（User、Strategy、Report、TradingSignal、BacktestTask、BacktestResult、StrategyPairMetrics）
+            # 验证 add_view 被调用七次
+            # （User、Strategy、Report、TradingSignal、BacktestTask、BacktestResult、StrategyPairMetrics）
             assert mock_admin_instance.add_view.call_count == 7

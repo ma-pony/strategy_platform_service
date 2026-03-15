@@ -248,9 +248,9 @@ class StrategyPairMetricsAdmin(ModelView, model=StrategyPairMetrics):
     ]
 
     # 权限配置（需求 5.4, 5.5）
-    can_delete = False   # 禁止删除，保护历史数据完整性（需求 5.4）
-    can_create = False   # 由 Worker 任务创建，不在后台创建
-    can_edit = True      # 允许管理员手动修正异常数据（需求 5.5）
+    can_delete = False  # 禁止删除，保护历史数据完整性（需求 5.4）
+    can_create = False  # 由 Worker 任务创建，不在后台创建
+    can_edit = True  # 允许管理员手动修正异常数据（需求 5.5）
     can_view_details = True
 
     # 可编辑字段（含全部指标字段及元数据，需求 5.5）

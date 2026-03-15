@@ -33,6 +33,7 @@ _executor = ProcessPoolExecutor(max_workers=_MAX_WORKERS)
 # 内部 Helper 函数
 # ─────────────────────────────────────────────
 
+
 def _lookup_strategy(strategy_name: str) -> dict[str, Any]:
     """查找策略注册表条目。
 
@@ -46,6 +47,7 @@ def _lookup_strategy(strategy_name: str) -> dict[str, Any]:
         UnsupportedStrategyError: 策略不存在于注册表
     """
     from src.freqtrade_bridge.strategy_registry import lookup
+
     return lookup(strategy_name)
 
 
@@ -151,9 +153,7 @@ def _extract_signal_from_df(df: Any, pair: str, timeframe: str = "1h") -> dict[s
 
     if enter_long == 1:
         direction = "buy"
-    elif enter_short == 1:
-        direction = "sell"
-    elif exit_long == 1:
+    elif enter_short == 1 or exit_long == 1:
         direction = "sell"
     elif exit_short == 1:
         direction = "buy"
@@ -206,9 +206,18 @@ def _extract_signal_from_df(df: Any, pair: str, timeframe: str = "1h") -> dict[s
 
     # 收集技术指标快照（过滤掉 OHLCV 基础列和信号列，保留指标列）
     _base_cols = {
-        "date", "open", "high", "low", "close", "volume",
-        "enter_long", "exit_long", "enter_short", "exit_short",
-        "enter_tag", "exit_tag",
+        "date",
+        "open",
+        "high",
+        "low",
+        "close",
+        "volume",
+        "enter_long",
+        "exit_long",
+        "enter_short",
+        "exit_short",
+        "enter_tag",
+        "exit_tag",
     }
     indicator_values: dict[str, Any] = {}
     for col in df.columns:
@@ -270,9 +279,7 @@ def _load_strategy_class(entry: dict[str, Any]) -> Any:
 
     spec = importlib.util.spec_from_file_location(class_name, str(file_path))
     if spec is None or spec.loader is None:
-        raise FreqtradeExecutionError(
-            f"无法加载策略文件，类名: {class_name}，路径: {file_path}"
-        )
+        raise FreqtradeExecutionError(f"无法加载策略文件，类名: {class_name}，路径: {file_path}")
     module = importlib.util.module_from_spec(spec)
     sys.modules[class_name] = module
     spec.loader.exec_module(module)  # type: ignore[union-attr]
@@ -314,9 +321,7 @@ def _fetch_signals_sync(strategy: str, pair: str) -> dict[str, Any]:
     except FreqtradeExecutionError:
         raise
     except Exception as exc:
-        raise FreqtradeExecutionError(
-            f"信号获取失败，策略: {strategy}，交易对: {pair}"
-        ) from exc
+        raise FreqtradeExecutionError(f"信号获取失败，策略: {strategy}，交易对: {pair}") from exc
 
 
 def fetch_signals_sync(strategy: str, pair: str) -> dict[str, Any]:
@@ -346,9 +351,7 @@ def fetch_signals_sync(strategy: str, pair: str) -> dict[str, Any]:
             pair=pair,
             exc_info=True,
         )
-        raise FreqtradeExecutionError(
-            f"信号获取发生意外错误，策略: {strategy}，交易对: {pair}"
-        ) from exc
+        raise FreqtradeExecutionError(f"信号获取发生意外错误，策略: {strategy}，交易对: {pair}") from exc
 
 
 async def fetch_signals(strategy: str, pair: str) -> dict[str, Any]:
@@ -379,6 +382,4 @@ async def fetch_signals(strategy: str, pair: str) -> dict[str, Any]:
             pair=pair,
             exc_info=True,
         )
-        raise FreqtradeExecutionError(
-            f"信号获取失败，策略: {strategy}，交易对: {pair}"
-        ) from exc
+        raise FreqtradeExecutionError(f"信号获取失败，策略: {strategy}，交易对: {pair}") from exc

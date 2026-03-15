@@ -43,9 +43,7 @@ def app(env_setup):
 @pytest.fixture()
 async def client(app) -> AsyncGenerator[AsyncClient, None]:
     """提供绑定测试应用的异步 HTTP 客户端。"""
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as ac:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         yield ac
 
 
@@ -84,9 +82,7 @@ def _make_mock_report(id: int = 1) -> MagicMock:
 class TestAnonymousAccess:
     """匿名用户访问公开接口。"""
 
-    async def test_anonymous_can_access_strategies_list(
-        self, client: AsyncClient, app
-    ) -> None:
+    async def test_anonymous_can_access_strategies_list(self, client: AsyncClient, app) -> None:
         """匿名用户可访问策略列表，只见基础字段。"""
         from src.core.deps import get_db
 
@@ -117,9 +113,7 @@ class TestAnonymousAccess:
         assert item.get("sharpe_ratio") is None
         assert item.get("win_rate") is None
 
-    async def test_anonymous_can_access_reports_list(
-        self, client: AsyncClient, app
-    ) -> None:
+    async def test_anonymous_can_access_reports_list(self, client: AsyncClient, app) -> None:
         """匿名用户可访问研报列表（无需登录）。"""
         from src.core.deps import get_db
 
@@ -148,9 +142,7 @@ class TestAnonymousAccess:
 class TestMembershipFieldVisibility:
     """会员等级字段可见性差异测试。"""
 
-    async def test_free_user_sees_mid_tier_fields_not_vip(
-        self, client: AsyncClient, app
-    ) -> None:
+    async def test_free_user_sees_mid_tier_fields_not_vip(self, client: AsyncClient, app) -> None:
         """Free 用户访问策略详情：中级指标（trade_count、max_drawdown）可见，高级指标不可见。"""
         from src.core.deps import get_db, get_optional_user
         from src.core.enums import MembershipTier
@@ -188,9 +180,7 @@ class TestMembershipFieldVisibility:
         assert item.get("sharpe_ratio") is None
         assert item.get("win_rate") is None
 
-    async def test_vip_user_sees_all_fields(
-        self, client: AsyncClient, app
-    ) -> None:
+    async def test_vip_user_sees_all_fields(self, client: AsyncClient, app) -> None:
         """VIP 用户访问策略详情，所有高级指标均可见。"""
         from src.core.deps import get_db, get_optional_user
         from src.core.enums import MembershipTier
@@ -231,9 +221,7 @@ class TestMembershipFieldVisibility:
 class TestDisabledUserBlocked:
     """禁用用户请求拦截测试。"""
 
-    async def test_disabled_user_token_returns_code_1001(
-        self, env_setup
-    ) -> None:
+    async def test_disabled_user_token_returns_code_1001(self, env_setup) -> None:
         """禁用用户（is_active=False）携带有效 token 请求时返回 code:1001。"""
         from src.api.main_router import create_app
         from src.core.deps import get_db
@@ -242,9 +230,7 @@ class TestDisabledUserBlocked:
 
         security = SecurityUtils()
         # 创建一个有效 access_token
-        access_token = security.create_access_token(
-            sub="99", membership=MembershipTier.FREE
-        )
+        access_token = security.create_access_token(sub="99", membership=MembershipTier.FREE)
 
         app = create_app()
         mock_db = AsyncMock()
@@ -260,11 +246,9 @@ class TestDisabledUserBlocked:
 
         app.dependency_overrides[get_db] = override_get_db
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as ac:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
             # 访问需要鉴权的接口（这里通过 get_current_user）
-            response = await ac.post(
+            await ac.post(
                 "/api/v1/auth/refresh",
                 headers={"Authorization": f"Bearer {access_token}"},
                 json={"refresh_token": "invalid"},
@@ -282,16 +266,13 @@ class TestDisabledUserBlocked:
         # 由于现有路由都使用 get_optional_user，我们直接验证 get_current_user 行为
         from src.core.deps import get_current_user
 
-        called_results: list[bool] = []
 
         async def override_get_current_user_disabled():
             from src.core.exceptions import AuthenticationError
 
             raise AuthenticationError("用户账户已被禁用")
 
-        app2.dependency_overrides[get_current_user] = (
-            override_get_current_user_disabled
-        )
+        app2.dependency_overrides[get_current_user] = override_get_current_user_disabled
 
         # 此测试通过 deps 的逻辑路径验证：is_active=False 时返回 code:1001
         # 已在 test_deps.py 中详细覆盖，此处仅做端到端确认
@@ -301,9 +282,7 @@ class TestDisabledUserBlocked:
 class TestErrorScenarios:
     """错误场景统一信封格式验证。"""
 
-    async def test_not_found_returns_code_3001(
-        self, client: AsyncClient, app
-    ) -> None:
+    async def test_not_found_returns_code_3001(self, client: AsyncClient, app) -> None:
         """资源不存在时返回 code:3001 HTTP 404。"""
         from src.core.deps import get_db
         from src.core.exceptions import NotFoundError
@@ -358,9 +337,7 @@ class TestErrorScenarios:
 
         app.dependency_overrides[get_db] = override_get_db
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as ac:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
             response = await ac.post(
                 "/api/v1/auth/refresh",
                 json={"refresh_token": expired_token},
@@ -371,9 +348,7 @@ class TestErrorScenarios:
         body = response.json()
         assert body["code"] == 1001
 
-    async def test_validation_error_returns_code_2001(
-        self, client: AsyncClient, app
-    ) -> None:
+    async def test_validation_error_returns_code_2001(self, client: AsyncClient, app) -> None:
         """请求参数校验失败时返回 code:2001 统一信封格式。"""
         from src.core.deps import get_db
 
@@ -396,9 +371,7 @@ class TestErrorScenarios:
         assert body["code"] == 2001
         assert "message" in body
 
-    async def test_report_not_found_returns_code_3001(
-        self, client: AsyncClient, app
-    ) -> None:
+    async def test_report_not_found_returns_code_3001(self, client: AsyncClient, app) -> None:
         """研报不存在时返回 code:3001 HTTP 404。"""
         from src.core.deps import get_db
         from src.core.exceptions import NotFoundError

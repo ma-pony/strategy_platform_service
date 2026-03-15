@@ -73,9 +73,7 @@ class TestSignalServiceGetSignals:
         mock_db.execute = AsyncMock(return_value=strategy_result)
 
         with patch("src.services.signal_service.get_redis_client", return_value=mock_redis):
-            signals, last_updated_at = await service.get_signals(
-                mock_db, strategy_id=1, limit=20
-            )
+            signals, last_updated_at = await service.get_signals(mock_db, strategy_id=1, limit=20)
 
         # 从缓存中读取
         assert len(signals) == 1
@@ -105,9 +103,7 @@ class TestSignalServiceGetSignals:
         mock_db.execute = AsyncMock(side_effect=[strategy_result, signals_result])
 
         with patch("src.services.signal_service.get_redis_client", return_value=mock_redis):
-            signals, last_updated_at = await service.get_signals(
-                mock_db, strategy_id=1, limit=20
-            )
+            signals, last_updated_at = await service.get_signals(mock_db, strategy_id=1, limit=20)
 
         assert len(signals) == 1
         assert isinstance(last_updated_at, datetime)
@@ -136,9 +132,7 @@ class TestSignalServiceGetSignals:
 
         with patch("src.services.signal_service.get_redis_client", return_value=mock_redis):
             # 不应抛出异常
-            signals, last_updated_at = await service.get_signals(
-                mock_db, strategy_id=1, limit=20
-            )
+            signals, _last_updated_at = await service.get_signals(mock_db, strategy_id=1, limit=20)
 
         assert len(signals) == 1
 
@@ -189,9 +183,7 @@ class TestSignalServiceGetSignals:
         mock_db.execute = AsyncMock(side_effect=[strategy_result, signals_result])
 
         with patch("src.services.signal_service.get_redis_client", return_value=mock_redis):
-            signals, last_updated_at = await service.get_signals(
-                mock_db, strategy_id=1, limit=20
-            )
+            _signals, last_updated_at = await service.get_signals(mock_db, strategy_id=1, limit=20)
 
         assert last_updated_at == signal_time
 
@@ -215,9 +207,7 @@ class TestSignalServiceGetSignals:
         mock_db.execute = AsyncMock(side_effect=[strategy_result, signals_result])
 
         with patch("src.services.signal_service.get_redis_client", return_value=mock_redis):
-            signals, last_updated_at = await service.get_signals(
-                mock_db, strategy_id=1, limit=20
-            )
+            signals, last_updated_at = await service.get_signals(mock_db, strategy_id=1, limit=20)
 
         assert signals == []
         assert isinstance(last_updated_at, datetime)

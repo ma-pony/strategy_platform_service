@@ -9,7 +9,6 @@
   - 各字段正确映射 freqtrade trade 结构
 """
 
-import pytest
 
 from src.freqtrade_bridge.backtester import _trades_to_signals
 

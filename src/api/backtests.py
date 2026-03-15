@@ -40,9 +40,7 @@ async def list_backtests(
       - VIP：含全部字段（含 sharpe_ratio, win_rate, annual_return）
     策略不存在时返回 code:3001 HTTP 404。
     """
-    results, total = await _backtest_service.list_backtests(
-        db, strategy_id=strategy_id, page=page, page_size=page_size
-    )
+    results, total = await _backtest_service.list_backtests(db, strategy_id=strategy_id, page=page, page_size=page_size)
 
     # 确定当前用户会员等级
     membership = current_user.membership if current_user is not None else None

@@ -48,11 +48,7 @@ class BacktestService:
         offset = (page - 1) * page_size
 
         # 查询该策略下的总数
-        count_stmt = (
-            select(func.count())
-            .select_from(BacktestResult)
-            .where(BacktestResult.strategy_id == strategy_id)
-        )
+        count_stmt = select(func.count()).select_from(BacktestResult).where(BacktestResult.strategy_id == strategy_id)
         count_result = await db.execute(count_stmt)
         total: int = count_result.scalar_one()
 
