@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session
 from src.models.signal import TradingSignal
 
 # 真实 OHLCV 数据路径（freqtrade download-data 输出目录）
-_DATA_DIR = Path("/tmp/freqtrade_data/binance")
+_DATA_DIR = Path("/tmp/freqtrade_data")
 
 # 排名前五的币种及对应数据文件
 _PAIR_FILES = {

@@ -241,14 +241,6 @@ class StrategyPairMetricsAdmin(ModelView, model=StrategyPairMetrics):
         StrategyPairMetrics.data_source,
     ]
 
-    # 可筛选字段（需求 5.2）
-    column_filters = [
-        StrategyPairMetrics.strategy_id,
-        StrategyPairMetrics.pair,
-        StrategyPairMetrics.timeframe,
-        StrategyPairMetrics.data_source,
-    ]
-
     # 可排序字段（需求 5.3）
     column_sortable_list = [
         StrategyPairMetrics.last_updated_at,

@@ -15,6 +15,7 @@ from typing import Sequence, Union
 
 import sqlalchemy as sa
 from alembic import op
+from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision: str = "006"
@@ -26,7 +27,7 @@ depends_on: Union[str, Sequence[str], None] = None
 def upgrade() -> None:
     """创建 datasource ENUM 类型和 strategy_pair_metrics 表。"""
     # 创建 datasource ENUM 类型（与 taskstatus / signaldirection 命名风格一致）
-    datasource_enum = sa.Enum("backtest", "live", name="datasource")
+    datasource_enum = postgresql.ENUM("backtest", "live", name="datasource", create_type=False)
     datasource_enum.create(op.get_bind(), checkfirst=True)
 
     # 创建 strategy_pair_metrics 表
@@ -42,10 +43,10 @@ def upgrade() -> None:
         sa.Column("max_drawdown", sa.Float(), nullable=True),
         sa.Column("sharpe_ratio", sa.Float(), nullable=True),
         sa.Column("trade_count", sa.Integer(), nullable=True),
-        # 元数据字段
+        # 元数据字段（使用 postgresql.ENUM 引用已创建的类型，不重复创建）
         sa.Column(
             "data_source",
-            sa.Enum("backtest", "live", name="datasource"),
+            postgresql.ENUM("backtest", "live", name="datasource", create_type=False),
             nullable=False,
         ),
         sa.Column(

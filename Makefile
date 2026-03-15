@@ -34,6 +34,9 @@ migrate:
 seed:
 	uv run python -m src.freqtrade_bridge.seeds.seed_strategies
 
+seed-all:
+	uv run python -m src.freqtrade_bridge.seeds.seed_all
+
 # Docker
 docker-build:
 	docker compose build

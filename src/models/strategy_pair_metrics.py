@@ -81,7 +81,7 @@ class StrategyPairMetrics(Base):
 
     # 元数据字段
     data_source: Mapped[DataSource] = mapped_column(
-        Enum(DataSource, name="datasource"),
+        Enum(DataSource, name="datasource", values_callable=lambda x: [e.value for e in x]),
         nullable=False,
     )
     last_updated_at: Mapped[datetime] = mapped_column(
