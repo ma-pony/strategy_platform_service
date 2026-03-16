@@ -1,10 +1,11 @@
-"""信号服务层（任务 9.1）。
+"""信号服务层（任务 9.1, 5.1）。
 
 提供交易信号查询业务逻辑：
   - 优先读取 Redis key signal:{strategy_id}，缓存未命中时回退至 PostgreSQL
   - Redis 不可用时静默回退至 DB，记录 WARNING 日志，不向客户端暴露缓存错误
   - 响应中必须携带 last_updated_at 字段标注数据时效
   - 策略不存在时抛出 NotFoundError(code=3001)
+  - list_signals：支持 strategy_id/pair/timeframe 过滤和 page/page_size 分页
 
 Redis 键设计：
   key: signal:{strategy_id}
@@ -121,6 +122,130 @@ class SignalService:
 
         return signals, last_updated_at
 
+    async def list_signals(
+        self,
+        db: AsyncSession,
+        strategy_id: int | None = None,
+        pair: str | None = None,
+        timeframe: str | None = None,
+        page: int = 1,
+        page_size: int = 20,
+    ) -> tuple[list[Any], int, datetime]:
+        """查询信号列表，支持过滤和分页。
+
+        查询策略：
+          1. 若指定 strategy_id，验证策略存在（不存在时抛出 NotFoundError）
+          2. 若指定 strategy_id，尝试从 Redis 缓存读取并在内存中过滤
+          3. 缓存未命中或无 strategy_id，从 PostgreSQL 查询
+
+        Args:
+            db: 异步数据库 session
+            strategy_id: 可选策略 ID 过滤
+            pair: 可选交易对过滤
+            timeframe: 可选时间周期过滤
+            page: 页码（从 1 开始）
+            page_size: 每页数量（默认 20，最大 100）
+
+        Returns:
+            (signals, total, last_updated_at) 元组
+
+        Raises:
+            NotFoundError: strategy_id 不为 None 且策略不存在（code=3001）
+        """
+        # Step 1: 若指定 strategy_id，验证策略存在
+        if strategy_id is not None:
+            strategy_stmt = select(Strategy).where(Strategy.id == strategy_id)
+            strategy_result = await db.execute(strategy_stmt)
+            strategy = strategy_result.scalar_one_or_none()
+            if strategy is None:
+                raise NotFoundError(f"策略 {strategy_id} 不存在")
+
+        # Step 2: 若指定 strategy_id，尝试 Redis 缓存
+        if strategy_id is not None:
+            cache_key = f"signal:{strategy_id}"
+            try:
+                redis_client = get_redis_client()
+                cached = redis_client.get(cache_key)
+                if cached is not None:
+                    data: dict[str, Any] = json.loads(cached)
+                    signals_raw = data.get("signals", [])
+                    last_updated_at_str: str = data.get("last_updated_at", datetime.now(timezone.utc).isoformat())
+                    last_updated_at = datetime.fromisoformat(last_updated_at_str)
+
+                    # 转换为对象
+                    signal_objects = _dicts_to_signals(signals_raw, strategy_id)
+
+                    # 内存过滤
+                    if pair is not None:
+                        signal_objects = [s for s in signal_objects if getattr(s, "pair", None) == pair]
+                    if timeframe is not None:
+                        signal_objects = [s for s in signal_objects if getattr(s, "timeframe", None) == timeframe]
+
+                    total = len(signal_objects)
+                    offset = (page - 1) * page_size
+                    paged = signal_objects[offset : offset + page_size]
+
+                    return paged, total, last_updated_at
+            except Exception as exc:
+                logger.warning(
+                    "Redis 读取失败，回退至数据库查询（list_signals）",
+                    strategy_id=strategy_id,
+                    error=str(exc),
+                )
+
+        # Step 3: 从数据库查询
+        return await self._list_signals_from_db(
+            db,
+            strategy_id=strategy_id,
+            pair=pair,
+            timeframe=timeframe,
+            page=page,
+            page_size=page_size,
+        )
+
+    async def _list_signals_from_db(
+        self,
+        db: AsyncSession,
+        strategy_id: int | None,
+        pair: str | None,
+        timeframe: str | None,
+        page: int,
+        page_size: int,
+    ) -> tuple[list[TradingSignal], int, datetime]:
+        """从 PostgreSQL 查询信号列表（含过滤和分页）。"""
+        from sqlalchemy import func
+
+        conditions = []
+        if strategy_id is not None:
+            conditions.append(TradingSignal.strategy_id == strategy_id)
+        if pair is not None:
+            conditions.append(TradingSignal.pair == pair)
+        if timeframe is not None:
+            conditions.append(TradingSignal.timeframe == timeframe)
+
+        # 总数查询
+        count_stmt = select(func.count()).select_from(TradingSignal)
+        if conditions:
+            count_stmt = count_stmt.where(*conditions)
+        count_result = await db.execute(count_stmt)
+        total: int = count_result.scalar() or 0
+
+        # 分页查询
+        offset = (page - 1) * page_size
+        stmt = select(TradingSignal).order_by(TradingSignal.signal_at.desc()).limit(page_size).offset(offset)
+        if conditions:
+            stmt = stmt.where(*conditions)
+
+        result = await db.execute(stmt)
+        signals: list[TradingSignal] = list(result.scalars().all())
+
+        if signals:
+            last_updated_at = signals[0].signal_at
+        else:
+            last_updated_at = datetime.now(timezone.utc)
+
+        return signals, total, last_updated_at
+
 
 def _dicts_to_signals(
     signals_raw: list[dict[str, Any]],
@@ -140,6 +265,7 @@ def _dicts_to_signals(
             id=raw.get("id", 0),
             strategy_id=raw.get("strategy_id", strategy_id),
             pair=raw.get("pair", ""),
+            timeframe=raw.get("timeframe"),
             direction=SignalDirection(raw.get("direction", "hold")),
             confidence_score=raw.get("confidence_score"),
             signal_at=datetime.fromisoformat(raw.get("signal_at", datetime.now(timezone.utc).isoformat())),

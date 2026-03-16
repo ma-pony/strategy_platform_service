@@ -12,8 +12,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from src.core.exceptions import NotFoundError
-
 
 def _make_mock_signal(
     id: int = 1,
@@ -29,6 +27,7 @@ def _make_mock_signal(
     signal.id = id
     signal.strategy_id = strategy_id
     signal.pair = pair
+    signal.timeframe = "1h"
     signal.direction = SignalDirection(direction)
     signal.confidence_score = confidence_score
     signal.signal_at = datetime(2024, 1, 1, 12, 0, tzinfo=timezone.utc)
@@ -153,6 +152,8 @@ class TestSignalServiceGetSignals:
 
         mock_db.execute = AsyncMock(return_value=strategy_result)
 
+        from src.core.exceptions import NotFoundError
+
         with patch("src.services.signal_service.get_redis_client", return_value=mock_redis):
             with pytest.raises(NotFoundError) as exc_info:
                 await service.get_signals(mock_db, strategy_id=999, limit=20)
@@ -210,4 +211,210 @@ class TestSignalServiceGetSignals:
             signals, last_updated_at = await service.get_signals(mock_db, strategy_id=1, limit=20)
 
         assert signals == []
+        assert isinstance(last_updated_at, datetime)
+
+
+class TestListSignals:
+    """任务 8.4：测试 SignalService.list_signals 方法（需求 4.1, 4.5, 4.6, 4.7）。"""
+
+    @pytest.mark.asyncio
+    async def test_raises_not_found_when_strategy_missing(self) -> None:
+        """strategy_id 不存在时抛出 NotFoundError(code=3001)（需求 4.5）。"""
+        from src.services.signal_service import SignalService
+
+        service = SignalService()
+
+        mock_db = AsyncMock()
+        strategy_result = MagicMock()
+        strategy_result.scalar_one_or_none.return_value = None
+        mock_db.execute = AsyncMock(return_value=strategy_result)
+
+        from src.core.exceptions import NotFoundError
+
+        with pytest.raises(NotFoundError):
+            await service.list_signals(db=mock_db, strategy_id=9999)
+
+    @pytest.mark.asyncio
+    async def test_filter_by_pair_from_redis(self) -> None:
+        """pair 过滤从 Redis 缓存中正确过滤（需求 4.1）。"""
+        import json
+
+        from src.services.signal_service import SignalService
+
+        service = SignalService()
+        now_iso = datetime.now(timezone.utc).isoformat()
+        cache_data = {
+            "signals": [
+                {
+                    "id": 1,
+                    "strategy_id": 1,
+                    "pair": "BTC/USDT",
+                    "timeframe": "1h",
+                    "direction": "buy",
+                    "confidence_score": 0.8,
+                    "signal_at": now_iso,
+                    "created_at": now_iso,
+                },
+                {
+                    "id": 2,
+                    "strategy_id": 1,
+                    "pair": "ETH/USDT",
+                    "timeframe": "1h",
+                    "direction": "hold",
+                    "confidence_score": 0.0,
+                    "signal_at": now_iso,
+                    "created_at": now_iso,
+                },
+            ],
+            "last_updated_at": now_iso,
+        }
+
+        mock_db = AsyncMock()
+        strategy_result = MagicMock()
+        strategy_result.scalar_one_or_none.return_value = MagicMock(id=1)
+        mock_db.execute = AsyncMock(return_value=strategy_result)
+
+        mock_redis = MagicMock()
+        mock_redis.get = MagicMock(return_value=json.dumps(cache_data))
+
+        with patch("src.services.signal_service.get_redis_client", return_value=mock_redis):
+            signals, total, _last_updated_at = await service.list_signals(
+                db=mock_db,
+                strategy_id=1,
+                pair="BTC/USDT",
+            )
+
+        # 过滤后只包含 BTC/USDT
+        for s in signals:
+            assert getattr(s, "pair", None) == "BTC/USDT"
+        assert total == len(signals)
+
+    @pytest.mark.asyncio
+    async def test_filter_by_timeframe_from_redis(self) -> None:
+        """timeframe 过滤从 Redis 缓存中正确过滤。"""
+        import json
+
+        from src.services.signal_service import SignalService
+
+        service = SignalService()
+        now_iso = datetime.now(timezone.utc).isoformat()
+        cache_data = {
+            "signals": [
+                {
+                    "id": 1,
+                    "strategy_id": 1,
+                    "pair": "BTC/USDT",
+                    "timeframe": "1h",
+                    "direction": "buy",
+                    "confidence_score": 0.7,
+                    "signal_at": now_iso,
+                    "created_at": now_iso,
+                },
+                {
+                    "id": 2,
+                    "strategy_id": 1,
+                    "pair": "BTC/USDT",
+                    "timeframe": "4h",
+                    "direction": "hold",
+                    "confidence_score": 0.0,
+                    "signal_at": now_iso,
+                    "created_at": now_iso,
+                },
+            ],
+            "last_updated_at": now_iso,
+        }
+
+        mock_db = AsyncMock()
+        strategy_result = MagicMock()
+        strategy_result.scalar_one_or_none.return_value = MagicMock(id=1)
+        mock_db.execute = AsyncMock(return_value=strategy_result)
+
+        mock_redis = MagicMock()
+        mock_redis.get = MagicMock(return_value=json.dumps(cache_data))
+
+        with patch("src.services.signal_service.get_redis_client", return_value=mock_redis):
+            signals, _total, _last_updated_at = await service.list_signals(
+                db=mock_db,
+                strategy_id=1,
+                timeframe="1h",
+            )
+
+        for s in signals:
+            assert getattr(s, "timeframe", None) == "1h"
+
+    @pytest.mark.asyncio
+    async def test_pagination_page_size(self) -> None:
+        """分页：page_size 限制返回数量（需求 4.6）。"""
+        import json
+
+        from src.services.signal_service import SignalService
+
+        service = SignalService()
+        now_iso = datetime.now(timezone.utc).isoformat()
+
+        # 5 条信号，但 page_size=2
+        signals_data = [
+            {
+                "id": i,
+                "strategy_id": 1,
+                "pair": "BTC/USDT",
+                "timeframe": "1h",
+                "direction": "buy",
+                "confidence_score": 0.7,
+                "signal_at": now_iso,
+                "created_at": now_iso,
+            }
+            for i in range(1, 6)
+        ]
+        cache_data = {"signals": signals_data, "last_updated_at": now_iso}
+
+        mock_db = AsyncMock()
+        strategy_result = MagicMock()
+        strategy_result.scalar_one_or_none.return_value = MagicMock(id=1)
+        mock_db.execute = AsyncMock(return_value=strategy_result)
+
+        mock_redis = MagicMock()
+        mock_redis.get = MagicMock(return_value=json.dumps(cache_data))
+
+        with patch("src.services.signal_service.get_redis_client", return_value=mock_redis):
+            signals, total, _last_updated_at = await service.list_signals(
+                db=mock_db,
+                strategy_id=1,
+                page=1,
+                page_size=2,
+            )
+
+        assert len(signals) == 2
+        assert total == 5  # 总数仍为 5
+
+    @pytest.mark.asyncio
+    async def test_redis_unavailable_falls_back_to_db(self) -> None:
+        """Redis 不可用时降级回 DB 查询，不抛出异常（需求 4.7）。"""
+        from src.services.signal_service import SignalService
+
+        service = SignalService()
+
+        mock_db = AsyncMock()
+        strategy_result = MagicMock()
+        strategy_result.scalar_one_or_none.return_value = MagicMock(id=1)
+
+        count_result = MagicMock()
+        count_result.scalar = MagicMock(return_value=0)
+
+        signals_result = MagicMock()
+        signals_result.scalars = MagicMock(return_value=MagicMock(all=MagicMock(return_value=[])))
+
+        mock_db.execute = AsyncMock(side_effect=[strategy_result, count_result, signals_result])
+
+        mock_redis = MagicMock()
+        mock_redis.get = MagicMock(side_effect=Exception("Redis down"))
+
+        with patch("src.services.signal_service.get_redis_client", return_value=mock_redis):
+            signals, total, last_updated_at = await service.list_signals(
+                db=mock_db,
+                strategy_id=1,
+            )
+
+        assert isinstance(signals, list)
+        assert isinstance(total, int)
         assert isinstance(last_updated_at, datetime)

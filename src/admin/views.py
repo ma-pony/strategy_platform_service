@@ -124,7 +124,14 @@ class ReportAdmin(ModelView, model=ResearchReport):
 
 
 class TradingSignalAdmin(ModelView, model=TradingSignal):
-    """交易信号管理视图。"""
+    """交易信号管理视图（只读）。
+
+    设置为只读视图（需求 5.3）：
+      - can_create=False：禁止新建
+      - can_edit=False：禁止编辑
+      - can_delete=False：禁止删除
+    支持按策略 ID、信号类型、时间范围过滤。
+    """
 
     name = "交易信号"
     name_plural = "交易信号列表"
@@ -141,14 +148,17 @@ class TradingSignalAdmin(ModelView, model=TradingSignal):
         TradingSignal.take_profit,
         TradingSignal.timeframe,
         TradingSignal.signal_strength,
+        TradingSignal.signal_source,
     ]
 
     column_searchable_list = [TradingSignal.pair, TradingSignal.direction]
-    column_sortable_list = [TradingSignal.signal_at, TradingSignal.confidence_score]
+    column_sortable_list = [TradingSignal.signal_at, TradingSignal.confidence_score, TradingSignal.strategy_id]
+    column_filters = [TradingSignal.strategy_id, TradingSignal.direction, TradingSignal.signal_at]
 
-    can_create = True
-    can_edit = True
-    can_delete = True
+    # 只读模式（需求 5.3）
+    can_create = False
+    can_edit = False
+    can_delete = False
     can_view_details = True
 
 

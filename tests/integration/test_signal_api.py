@@ -60,6 +60,7 @@ def _make_mock_signal(
     signal.id = id
     signal.strategy_id = strategy_id
     signal.pair = "BTC/USDT"
+    signal.timeframe = "1h"
     signal.direction = SignalDirection.BUY
     signal.confidence_score = confidence_score
     signal.signal_at = datetime(2024, 1, 1, 12, 0, tzinfo=timezone.utc)

@@ -25,6 +25,7 @@ celery_app = Celery(
     include=[
         "src.workers.tasks.backtest_tasks",
         "src.workers.tasks.signal_tasks",
+        "src.workers.tasks.signal_coord_task",
     ],
 )
 
@@ -50,18 +51,41 @@ celery_app.conf.task_default_queue = "backtest"
 # celery -A src.workers.celery_app worker -Q backtest --concurrency=1
 celery_app.conf.worker_prefetch_multiplier = 1  # 串行队列每次只预取 1 个任务
 
+
 # ──────────────────────────────────────────────
 # Celery Beat 定时计划
 # ──────────────────────────────────────────────
+def _parse_crontab(cron_expr: str) -> crontab:
+    """将 crontab 表达式字符串解析为 celery crontab 对象。
+
+    支持 5 段式 cron 格式：minute hour day_of_month month_of_year day_of_week
+    默认回退为每小时整点触发。
+    """
+    try:
+        parts = cron_expr.strip().split()
+        if len(parts) == 5:
+            return crontab(
+                minute=parts[0],
+                hour=parts[1],
+                day_of_month=parts[2],
+                month_of_year=parts[3],
+                day_of_week=parts[4],
+            )
+    except Exception:
+        pass
+    # 回退：每小时整点
+    return crontab(minute=0)
+
+
 celery_app.conf.beat_schedule = {
     "run-daily-backtest": {
         "task": "src.workers.tasks.backtest_tasks.run_backtest_task",
         "schedule": crontab(hour=2, minute=0),  # 每日 UTC 02:00
         "options": {"queue": "backtest"},
     },
-    "generate-signals-every-15min": {
-        "task": "src.workers.tasks.signal_tasks.generate_signals_task",
-        "schedule": crontab(minute="*/15"),  # 每 15 分钟
+    "generate-all-signals-coordinated": {
+        "task": "src.workers.tasks.signal_coord_task.generate_all_signals_task",
+        "schedule": _parse_crontab(settings.signal_refresh_interval_cron),  # 默认每小时整点
         "options": {"queue": "signal"},
     },
 }

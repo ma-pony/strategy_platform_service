@@ -4,9 +4,26 @@
 必填字段：SECRET_KEY、DATABASE_URL、DATABASE_SYNC_URL、REDIS_URL。
 """
 
+import json
 from functools import lru_cache
+from pathlib import Path
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# 默认信号生成覆盖交易对（10 个主流交易对）
+_DEFAULT_SIGNAL_PAIRS = [
+    "BTC/USDT",
+    "ETH/USDT",
+    "BNB/USDT",
+    "SOL/USDT",
+    "XRP/USDT",
+    "ADA/USDT",
+    "DOGE/USDT",
+    "AVAX/USDT",
+    "DOT/USDT",
+    "MATIC/USDT",
+]
 
 
 class AppSettings(BaseSettings):
@@ -40,12 +57,36 @@ class AppSettings(BaseSettings):
     db_pool_size: int = 10
     db_max_overflow: int = 20
 
-    # 信号生成配置
+    # 信号生成配置（旧）
     signal_max_workers: int = 2  # ProcessPoolExecutor 最大并发进程数
     signal_refresh_interval: int = 5  # 信号刷新周期（分钟），默认 5 分钟
 
-    # freqtrade 回测配置
-    freqtrade_datadir: str = "/tmp/freqtrade_data"  # noqa: S108  # OHLCV 数据目录
+    # freqtrade OHLCV 数据目录（持久化路径，需求 1.7）
+    # 旧配置项保留用于回测，新实时信号流水线使用 freqtrade_datadir（Path 类型）
+    freqtrade_datadir: Path = Path("/opt/freqtrade_data")  # 持久化 OHLCV 数据目录
+
+    # 实时信号调度配置（需求 5.1）
+    signal_refresh_interval_cron: str = "0 * * * *"  # crontab 表达式，默认每小时整点
+
+    # 实时信号覆盖范围配置（需求 2.8）
+    signal_pairs: list[str] = _DEFAULT_SIGNAL_PAIRS  # type: ignore[assignment]
+    signal_timeframes: list[str] = ["1h"]  # type: ignore[assignment]  # 默认仅 1h 周期
+
+    @field_validator("signal_pairs", "signal_timeframes", mode="before")
+    @classmethod
+    def parse_json_list(cls, v: object) -> object:
+        """支持环境变量以 JSON 字符串形式传入列表。
+
+        例如：SIGNAL_PAIRS='["BTC/USDT","ETH/USDT"]'
+        """
+        if isinstance(v, str):
+            try:
+                parsed = json.loads(v)
+                if isinstance(parsed, list):
+                    return parsed
+            except (json.JSONDecodeError, ValueError):
+                pass
+        return v
 
 
 @lru_cache(maxsize=1)

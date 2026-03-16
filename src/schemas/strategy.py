@@ -248,9 +248,10 @@ class SignalRead(BaseModel):
     id: int
     strategy_id: int
     pair: str
-    direction: SignalDirection
-    signal_at: datetime
-    created_at: datetime
+    timeframe: str | None = None
+    direction: SignalDirection = Field(serialization_alias="signal_type")
+    signal_at: datetime = Field(serialization_alias="bar_timestamp")
+    created_at: datetime = Field(serialization_alias="generated_at")
 
     # VIP 专属
     confidence_score: float | None = Field(

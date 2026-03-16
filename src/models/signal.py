@@ -55,7 +55,7 @@ class TradingSignal(Base):
     stop_loss: Mapped[float | None] = mapped_column(Float, nullable=True)
     take_profit: Mapped[float | None] = mapped_column(Float, nullable=True)
     indicator_values: Mapped[dict | None] = mapped_column(JSON, nullable=True)
-    timeframe: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    timeframe: Mapped[str] = mapped_column(String(16), nullable=False, server_default="1h")
     signal_strength: Mapped[float | None] = mapped_column(Float, nullable=True)
     volume: Mapped[float | None] = mapped_column(Float, nullable=True)
     volatility: Mapped[float | None] = mapped_column(Float, nullable=True)
