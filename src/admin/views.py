@@ -151,7 +151,7 @@ class TradingSignalAdmin(ModelView, model=TradingSignal):
         TradingSignal.signal_source,
     ]
 
-    column_searchable_list = [TradingSignal.pair, TradingSignal.direction]
+    column_searchable_list = [TradingSignal.pair]
     column_sortable_list = [TradingSignal.signal_at, TradingSignal.confidence_score, TradingSignal.strategy_id]
     column_filters = [TradingSignal.strategy_id, TradingSignal.direction, TradingSignal.signal_at]
 
