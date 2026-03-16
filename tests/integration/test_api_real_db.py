@@ -670,10 +670,12 @@ class TestSignalApiRealDB:
         """limit 参数正确限制返回数量。"""
         strategy = await _create_strategy(db_session, name="SigLimitStrat")
         now = datetime.datetime.now(tz=datetime.timezone.utc)
+        pairs = ["BTC/USDT", "ETH/USDT", "SOL/USDT", "XRP/USDT", "DOGE/USDT"]
         for i in range(5):
             await _create_signal(
                 db_session,
                 strategy.id,
+                pair=pairs[i],
                 signal_at=now - datetime.timedelta(hours=i),
             )
 

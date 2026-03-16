@@ -63,8 +63,8 @@ def generate_config(
 
     # 替换模板占位符（数据目录使用全局共享路径）
     template["timerange"] = timerange
-    template["datadir"] = settings.freqtrade_datadir
-    template["strategy_path"] = strategy_path
+    template["datadir"] = str(settings.freqtrade_datadir)
+    template["strategy_path"] = str(strategy_path)
 
     # 合并策略自定义配置（过滤敏感字段）
     for key, value in strategy_config.items():
