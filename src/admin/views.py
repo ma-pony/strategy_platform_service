@@ -153,7 +153,6 @@ class TradingSignalAdmin(ModelView, model=TradingSignal):
 
     column_searchable_list = [TradingSignal.pair]
     column_sortable_list = [TradingSignal.signal_at, TradingSignal.confidence_score, TradingSignal.strategy_id]
-    column_filters = [TradingSignal.strategy_id, TradingSignal.direction, TradingSignal.signal_at]
 
     # 只读模式（需求 5.3）
     can_create = False
