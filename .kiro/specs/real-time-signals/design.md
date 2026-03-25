@@ -503,21 +503,22 @@ class SignalComputeResult:
 
 ### API 层
 
-#### SignalRouter（顶级信号路由，新增）
+#### SignalRouter（信号查询路由）
 
 | 字段 | 详情 |
 |------|------|
-| 意图 | 提供 `/api/v1/signals` 顶级端点，支持过滤、分页和字段级权限控制 |
-| 需求 | 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7 |
+| 意图 | 提供 `GET /api/v1/strategies/{strategy_id}/signals` 端点，查询指定策略的最新信号 |
+| 需求 | 4.1, 4.2, 4.3, 4.5 |
 
 **职责与约束**
-- 新建 `src/api/signals_top.py`，注册路由前缀 `/signals`（区别于现有 `/strategies/{id}/signals`）
+- 实现在 `src/api/signals.py`，路由前缀 `/strategies`
 - 无状态，仅负责参数校验 → 调用 `SignalService` → 构造统一响应信封
 - 字段级权限过滤复用现有 `SignalRead.filter_by_tier` 机制
+- `SignalRead` 直接使用内部字段名（`direction`、`signal_at`、`created_at`），不使用序列化别名
 
 **依赖**
 - 入站：前端客户端（P0）
-- 出站：`SignalService.list_signals`（P0）；`get_optional_user` 依赖注入（P1）
+- 出站：`SignalService.get_signals`（P0）；`get_optional_user` 依赖注入（P1）
 
 **契约**：API [x]
 
@@ -525,8 +526,7 @@ class SignalComputeResult:
 
 | 方法 | 端点 | 查询参数 | 响应 | 错误 |
 |------|------|---------|------|------|
-| GET | `/api/v1/signals` | `strategy_id?: int`, `pair?: str`, `timeframe?: str`, `page: int=1`, `page_size: int=20` | `ApiResponse[PaginatedResponse[SignalRead]]` | 无（空列表） |
-| GET | `/api/v1/signals/{strategy_id}` | `page: int=1`, `page_size: int=20` | `ApiResponse[PaginatedResponse[SignalRead]]` | 3001 / 404（策略不存在）|
+| GET | `/api/v1/strategies/{strategy_id}/signals` | `limit: int=20`（1~100） | `ApiResponse[{signals: SignalRead[], last_updated_at: str}]` | 3001 / 404（策略不存在）|
 
 响应示例（匿名用户）：
 ```json
@@ -534,27 +534,26 @@ class SignalComputeResult:
   "code": 0,
   "message": "success",
   "data": {
-    "items": [
+    "signals": [
       {
         "id": 1,
         "strategy_id": 2,
         "pair": "BTC/USDT",
         "timeframe": "1h",
-        "signal_type": "BUY",
-        "bar_timestamp": "2026-03-15T10:00:00Z",
-        "confidence": null
+        "direction": "buy",
+        "signal_at": "2026-03-15T10:00:00Z",
+        "created_at": "2026-03-15T10:01:30Z",
+        "confidence_score": null
       }
     ],
-    "total": 30,
-    "page": 1,
-    "page_size": 20
+    "last_updated_at": "2026-03-15T10:01:30Z"
   }
 }
 ```
 
 **实现说明**
-- 路由注册在 `src/api/main_router.py` 中 include，前缀 `/api/v1`
-- VIP1+ 用户的 `confidence_score` 通过 `SignalRead.model_dump(context={"membership": tier})` 控制（现有机制，无需修改 Schema 定义）
+- 路由注册在 `src/api/app.py` 和 `src/api/main_router.py` 中 include，前缀 `/api/v1`
+- VIP1+ 用户的 `confidence_score` 通过 `SignalRead.model_dump(context={"membership": tier})` 控制
 
 ---
 
@@ -683,8 +682,8 @@ class SignalService:
 | `pair` | VARCHAR(32) | NOT NULL | （现有）|
 | `timeframe` | VARCHAR(16) | NOT NULL | 由现有 NULLABLE 改为 NOT NULL |
 | `signal_source` | VARCHAR(32) | NOT NULL, DEFAULT 'realtime' | （现有）|
-| `signal_at` | TIMESTAMPTZ | NOT NULL | 承载 K 线时间戳（`bar_timestamp` 语义）|
-| `created_at` | TIMESTAMPTZ | NOT NULL, server_default=now() | 承载信号生成时间（`generated_at` 语义）|
+| `signal_at` | TIMESTAMPTZ | NOT NULL | K 线时间戳 |
+| `created_at` | TIMESTAMPTZ | NOT NULL, server_default=now() | 信号生成时间 |
 | — | 唯一索引 | `UNIQUE(strategy_id, pair, timeframe)` | **新增**，支持 upsert |
 | — | 普通索引 | `INDEX(created_at DESC)` | **新增**，加速时间范围查询 |
 
@@ -715,12 +714,12 @@ class SignalService:
 | `strategy_id` | int | 所有用户 | 策略 ID |
 | `pair` | str | 所有用户 | 交易对 |
 | `timeframe` | str \| None | 所有用户 | 时间周期 |
-| `signal_type` | SignalDirection | 所有用户 | BUY/SELL/HOLD（对应 `direction` 字段别名）|
-| `bar_timestamp` | datetime | 所有用户 | K 线时间（对应 `signal_at`）|
-| `confidence` | float \| None | VIP1+ | 置信度（对应 `confidence_score`，匿名/Free 为 null）|
-| `generated_at` | datetime | 所有用户 | 信号生成时间（对应 `created_at`）|
+| `direction` | SignalDirection | 所有用户 | 信号方向：buy/sell/hold |
+| `signal_at` | datetime | 所有用户 | K 线时间戳 |
+| `created_at` | datetime | 所有用户 | 信号生成时间 |
+| `confidence_score` | float \| None | VIP1+ | 置信度（匿名/Free 为 null）|
 
-> **注意**：`SignalRead` schema 将在本功能中扩展字段别名（`signal_type` 对应 `direction`，`bar_timestamp` 对应 `signal_at`），以对齐需求规格中的字段命名，同时保持向后兼容。
+> **注意**：`SignalRead` schema 直接使用内部字段名（`direction`、`signal_at`、`created_at`），不使用序列化别名，保持 API 返回与数据库字段一致。
 
 ---
 
@@ -793,7 +792,7 @@ class SignalService:
 
 - `DataDownloader` + 本地 datadir：使用测试 fixtures 的本地 OHLCV 文件（非真实 Binance），验证新鲜度检查和降级逻辑
 - `SignalCalculator.compute_all_signals` 端到端：给定本地数据文件，验证 DB upsert 后表中每组合仅一条记录
-- `GET /api/v1/signals`：测试过滤和分页参数；测试匿名 / VIP1 用户的 `confidence` 字段可见性
+- `GET /api/v1/strategies/{id}/signals`：测试 limit 参数；测试匿名 / VIP1 用户的 `confidence_score` 字段可见性
 - `POST /api/v1/admin/signals/refresh`：测试管理员权限验证；测试任务入队返回 task_id
 
 ### 性能验证

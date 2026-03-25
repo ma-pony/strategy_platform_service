@@ -193,10 +193,10 @@ sequenceDiagram
 | 3.6 | 匿名用户调用回测接口返回 code:1001 | AdminBacktestIntegTest | POST /api/v1/admin/backtests | — |
 | 3.7 | Free 用户超配额返回相应错误码 | AdminBacktestIntegTest | POST /api/v1/admin/backtests | — |
 | 3.8 | 回测结果正确持久化到 DB | RealDBIntegTest | DB 查询验证 | 真实 DB 流程 |
-| 4.1 | 信号接口返回 200 + 缓存信号 | SignalIntegTest | GET /api/v1/signals | — |
-| 4.2 | 匿名用户信号仅基础字段 | SignalIntegTest | GET /api/v1/signals | — |
-| 4.3 | VIP 用户信号含 confidence_score | SignalIntegTest | GET /api/v1/signals | — |
-| 4.4 | 无缓存数据返回空列表非 500 | SignalIntegTest | GET /api/v1/signals | — |
+| 4.1 | 信号接口返回 200 + 缓存信号 | SignalIntegTest | GET /api/v1/strategies/{id}/signals | — |
+| 4.2 | 匿名用户信号仅基础字段 | SignalIntegTest | GET /api/v1/strategies/{id}/signals | — |
+| 4.3 | VIP 用户信号含 confidence_score | SignalIntegTest | GET /api/v1/strategies/{id}/signals | — |
+| 4.4 | 无缓存数据返回空列表非 500 | SignalIntegTest | GET /api/v1/strategies/{id}/signals | — |
 | 4.5 | P95 响应时间不超 500ms | （延后，标记 skip） | — | — |
 | 5.1 | 匿名访问研报列表返回 200 | ReportIntegTest | GET /api/v1/reports | — |
 | 5.2 | 匿名访问研报详情返回完整内容 | ReportIntegTest | GET /api/v1/reports/{id} | — |

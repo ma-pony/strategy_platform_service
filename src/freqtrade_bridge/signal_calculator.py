@@ -40,7 +40,7 @@ class SignalData:
     Attributes:
         direction: 信号方向（buy/sell/hold）
         confidence_score: 置信度（0.0–1.0）
-        signal_at: K 线时间戳（bar_timestamp 语义）
+        signal_at: K 线时间戳
         signal_source: 数据来源（realtime 等）
     """
 

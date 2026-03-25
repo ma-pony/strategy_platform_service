@@ -86,18 +86,15 @@
   - 保留现有 `get_signals` 方法不变（向后兼容）
   - _Requirements: 4.1, 4.5, 4.6, 4.7_
 
-- [x] 5.2 (P) 扩展 SignalRead Schema 字段别名和会员权限控制
-  - 在 `SignalRead` Schema 中确认 `signal_type`（对应 ORM `direction` 字段）和 `bar_timestamp`（对应 ORM `signal_at` 字段）别名映射
-  - 通过现有 `filter_by_tier` 机制：匿名和 Free 用户 `confidence` 字段返回 `null`，VIP1 及以上用户返回实际数值
-  - 确保 `generated_at` 字段映射至 ORM `created_at`，保持 API 字段命名与需求规格一致
+- [x] 5.2 (P) SignalRead Schema 会员权限控制
+  - `SignalRead` 直接使用内部字段名（`direction`、`signal_at`、`created_at`），不使用序列化别名
+  - 通过现有 `filter_by_tier` 机制：匿名和 Free 用户 `confidence_score` 字段返回 `null`，VIP1 及以上用户返回实际数值
   - _Requirements: 4.2, 4.3_
 
-- [x] 5.3 新增顶级信号查询路由
-  - 在 `src/api/` 新建顶级信号路由模块，注册以下两个端点：`GET /api/v1/signals`（支持 `strategy_id`、`pair`、`timeframe`、`page`、`page_size` 查询参数）和 `GET /api/v1/signals/{strategy_id}`（返回该策略在所有激活交易对上的最新信号）
-  - 两个端点均通过 `get_optional_user` 依赖注入获取当前用户信息（允许匿名），并将会员等级传入 Schema 过滤逻辑
-  - 响应使用统一信封格式 `ApiResponse[PaginatedResponse[SignalRead]]`；策略不存在时返回 3001/404
-  - 在 `src/api/main_router.py` 中注册该路由，前缀 `/api/v1`
-  - _Requirements: 4.1, 4.4, 4.5, 4.6_
+- [x] 5.3 信号查询路由（已由 `src/api/signals.py` 提供）
+  - `GET /api/v1/strategies/{strategy_id}/signals` 端点通过 `get_optional_user` 依赖注入获取当前用户信息（允许匿名），并将会员等级传入 Schema 过滤逻辑
+  - 响应使用统一信封格式；策略不存在时返回 3001/404
+  - _Requirements: 4.1, 4.5_
 
 - [x] 6. 管理员接口与后台视图
 - [x] 6.1 (P) 新增管理员手动刷新信号接口
@@ -154,10 +151,10 @@
   - _Requirements: 2.6, 3.2_
 
 - [x] 9.3 (P) 信号查询 API 集成测试
-  - 测试 `GET /api/v1/signals` 过滤和分页参数的正确性
-  - 测试匿名用户请求时 `confidence` 字段为 `null`；VIP1 用户请求时返回实际置信度数值
-  - 测试 `GET /api/v1/signals/{strategy_id}` 在策略不存在时返回 3001/404
-  - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5_
+  - 测试 `GET /api/v1/strategies/{strategy_id}/signals` 的 limit 参数和响应结构
+  - 测试匿名用户请求时 `confidence_score` 字段为 `null`；VIP1 用户请求时返回实际置信度数值
+  - 测试策略不存在时返回 3001/404
+  - _Requirements: 4.1, 4.2, 4.3, 4.5_
 
 - [x] 9.4 (P) 管理员接口集成测试
   - 测试 `POST /api/v1/admin/signals/refresh` 需要管理员权限：非管理员返回 1002/403

@@ -13,7 +13,7 @@
   - freqtrade `download-data` CLI 原生支持增量更新，无需业务层手动对比文件时间戳；当本地数据存在时自动补充缺失区间至当前时刻
   - `freqtrade.data.history.load_pair_history` 可从本地 datadir 加载 OHLCV DataFrame，配合 `IStrategy.populate_indicators / populate_entry_trend / populate_exit_trend` 方法链实现离线信号计算，无需启动真实 bot
   - 当前 `signal_tasks.py` 的 `generate_signals_task` 采用"按单个 (strategy_id, pair) 分发独立 Celery 任务"模式，缺乏全局协调；实时信号需要改为"单次全量协调任务 + 两阶段流水线"模式，并通过 Redis `SET NX` 实现幂等锁
-  - 现有 `trading_signals` 表结构（含 `timeframe` 字段）已能支撑 upsert 语义，需增加 `(strategy_id, pair, timeframe)` 唯一约束和 `bar_timestamp` / `signal_source` 字段对齐需求规格
+  - 现有 `trading_signals` 表结构（含 `timeframe` 字段）已能支撑 upsert 语义，需增加 `(strategy_id, pair, timeframe)` 唯一约束；`signal_at` 字段复用为 K 线时间戳语义，`created_at` 作为信号生成时间
 
 ---
 
@@ -73,27 +73,25 @@
 
 ### 话题：现有 trading_signals 表与需求规格差距分析
 
-- **背景**: 需求 3.1 定义了 `trading_signals` 表字段，包含 `bar_timestamp`、`signal_source` 等字段；需核查现有表结构。
+- **背景**: 需求 3.1 定义了 `trading_signals` 表字段，需核查现有表结构。
 - **来源**: `src/models/signal.py`，`migrations/versions/004_create_trading_signals.py`
 - **发现**:
-  - 现有表缺少 `bar_timestamp` 字段（需求 3.1 中为 K 线 UTC 时间，与 `signal_at` 语义相近但不同）
+  - 现有 `signal_at` 字段复用为 K 线时间戳语义，`created_at` 作为信号生成时间（无需新增列）
   - `signal_source` 字段已存在（`server_default="realtime"`）
   - `timeframe` 字段已存在
   - 缺少 `(strategy_id, pair, timeframe)` 唯一约束（需求 3.2, 3.3 要求 upsert 语义）
-  - 设计决策：将现有 `signal_at` 字段复用为 `bar_timestamp` 语义（信号对应的 K 线时间），增加 `(strategy_id, pair, timeframe)` 唯一约束以支持 upsert
-- **影响**: 需新增 Alembic 迁移：(1) 添加 `(strategy_id, pair, timeframe)` 唯一约束，(2) 在 `signal_at` 上添加普通索引（如果尚不存在），(3) 调整 `signal_source` 列使其具有明确的 "realtime" 默认值
+  - 设计决策：直接复用现有字段名（`direction`、`signal_at`、`created_at`），API 层不使用别名，保持内外一致
+- **影响**: 需新增 Alembic 迁移：(1) 添加 `(strategy_id, pair, timeframe)` 唯一约束，(2) 在 `created_at` 上添加普通索引（如果尚不存在），(3) 调整 `signal_source` 列使其具有明确的 "realtime" 默认值
 
 ### 话题：API 扩展（需求 4）
 
 - **背景**: 需求 4 定义了两个新 API 端点和分页要求；需核查现有 `signals.py` 路由结构。
 - **来源**: `src/api/signals.py`
 - **发现**:
-  - 现有仅有 `GET /strategies/{strategy_id}/signals` 接口，路径嵌套在 strategies 资源下
-  - 需求 4.1 要求 `GET /api/v1/signals`（顶级，按 strategy_id/pair/timeframe 过滤）
-  - 需求 4.4 要求 `GET /api/v1/signals/{strategy_id}`（按策略 ID 查询）
+  - 现有 `GET /strategies/{strategy_id}/signals` 接口提供按策略查询信号的功能
   - 需求 4.2/4.3 中的字段权限控制（隐藏 confidence_score）与现有 `SignalRead` Schema 已有机制一致
-  - 需求 4.6 要求分页，现有接口仅有 `limit` 参数，无标准分页 schema
-- **影响**: 新增 `src/api/signals_v2.py`（或扩展现有），添加两个顶级路由；扩展 `SignalService` 增加过滤和分页支持
+  - 接口使用 `limit` 参数控制返回数量
+- **影响**: 信号查询统一通过 `GET /api/v1/strategies/{strategy_id}/signals` 端点提供；`SignalRead` Schema 直接使用内部字段名（`direction`、`signal_at`、`created_at`），不使用序列化别名
 
 ---
 
@@ -111,13 +109,13 @@
 
 ### 决策：复用 `signal_at` 字段语义为 K 线时间戳
 
-- **背景**: 需求 3.1 定义 `bar_timestamp`（K 线 UTC 时间），现有表有 `signal_at` 字段
+- **背景**: 需求中定义了 K 线 UTC 时间字段，现有表有 `signal_at` 字段
 - **备选**:
   1. 新增 `bar_timestamp` 列，保留 `signal_at` 作为生成时间
-  2. 复用 `signal_at` 承载 K 线时间戳语义，新增 `generated_at` 列（或直接用 `created_at`）
-- **选定方案**: 方案 2 + 将 `created_at` 视为 `generated_at`，不引入新列；在代码注释中明确 `signal_at` = K 线时间戳
-- **理由**: 避免迁移复杂度；`created_at` 已由 `server_default=func.now()` 自动填充，等效于 `generated_at`
-- **权衡**: 字段命名略有歧义，但通过注释和文档对齐
+  2. 复用 `signal_at` 承载 K 线时间戳语义，`created_at` 作为信号生成时间
+- **选定方案**: 方案 2 — `signal_at` = K 线时间戳，`created_at` = 信号生成时间；API 层直接使用这些字段名，不引入序列化别名
+- **理由**: 避免迁移复杂度和别名混淆；`created_at` 已由 `server_default=func.now()` 自动填充；内外一致的字段命名降低前端对接成本
+- **权衡**: 无，统一命名消除了歧义
 
 ### 决策：使用 Redis SET NX EX 原语实现分布式锁
 

@@ -10,7 +10,9 @@ import datetime
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session
 
-from config import settings
+from src.core.app_settings import get_settings
+
+settings = get_settings()
 
 REPORTS = [
     {

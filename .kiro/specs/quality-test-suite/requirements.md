@@ -64,7 +64,7 @@
 
 #### 验收标准
 
-1. When 任意用户调用 `GET /api/v1/signals` 或 `GET /api/v1/strategies/{id}/signals`，the Test Suite shall 验证响应返回最新缓存的交易信号（Buy/Sell/Hold），且 HTTP 状态码为 200。
+1. When 任意用户调用 `GET /api/v1/strategies/{id}/signals`，the Test Suite shall 验证响应返回最新缓存的交易信号（buy/sell/hold），且 HTTP 状态码为 200。
 2. When 匿名用户请求信号数据，the Test Suite shall 验证响应仅包含基础信号字段，不包含高级字段（如可信度评分）。
 3. When VIP 用户请求信号数据，the Test Suite shall 验证响应包含完整信号字段，包括可信度评分等高级指标。
 4. If 信号缓存中不存在指定策略和交易对的数据，the Test Suite shall 验证系统返回空列表或适当提示，而非 500 错误。

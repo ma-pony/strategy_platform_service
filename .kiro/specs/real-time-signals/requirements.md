@@ -48,9 +48,9 @@
 
 #### Acceptance Criteria
 
-1. The Signal Platform shall 复用现有 `trading_signals` 表结构，包含字段：`id`、`strategy_id`（外键 `strategies.id`）、`pair`（交易对，如 `BTC/USDT`）、`timeframe`（时间周期）、`signal_type`（枚举：`BUY` / `SELL` / `HOLD`）、`confidence`（小数，0–1）、`bar_timestamp`（K 线 UTC 时间）、`generated_at`（生成 UTC 时间）、`signal_source`（`realtime`）、`created_at`、`updated_at`。
+1. The Signal Platform shall 复用现有 `trading_signals` 表结构，包含字段：`id`、`strategy_id`（外键 `strategies.id`）、`pair`（交易对，如 `BTC/USDT`）、`timeframe`（时间周期）、`direction`（枚举：`BUY` / `SELL` / `HOLD`）、`confidence_score`（小数，0–1）、`signal_at`（K 线 UTC 时间）、`created_at`（生成 UTC 时间）、`signal_source`（`realtime`）、`updated_at`。
 2. When 信号生成完成, the Signal Platform shall 以 upsert 方式（基于 `strategy_id + pair + timeframe` 唯一约束）写入信号记录，确保幂等性。
-3. The Signal Platform shall 确保 `trading_signals` 表在 `(strategy_id, pair, timeframe)` 列上有唯一索引，在 `generated_at` 列上有普通索引以加速时间范围查询。如已存在则无需重复创建。
+3. The Signal Platform shall 确保 `trading_signals` 表在 `(strategy_id, pair, timeframe)` 列上有唯一索引，在 `created_at` 列上有普通索引以加速时间范围查询。如已存在则无需重复创建。
 4. If 数据库写入失败, the Signal Platform shall 记录错误日志并将异常上报给调度框架，不丢失错误信息。
 
 ---
@@ -61,10 +61,9 @@
 
 #### Acceptance Criteria
 
-1. The Signal Platform shall 提供 `GET /api/v1/signals` 接口，支持按 `strategy_id`、`pair`、`timeframe` 过滤，返回最新信号列表，响应使用统一信封格式 `{"code": 0, "message": "success", "data": {...}}`。
-2. When 匿名用户请求信号列表, the Signal Platform shall 返回基础字段（`strategy_id`、`pair`、`timeframe`、`signal_type`、`bar_timestamp`），隐藏 `confidence`（置信度）字段。
-3. Where VIP1 及以上会员已登录, the Signal Platform shall 在响应中额外返回 `confidence`（置信度）字段。
-4. The Signal Platform shall 提供 `GET /api/v1/signals/{strategy_id}` 接口，返回该策略在所有启用交易对上的最新信号列表。
+1. The Signal Platform shall 提供 `GET /api/v1/strategies/{strategy_id}/signals` 接口，返回该策略的最新信号列表，响应使用统一信封格式 `{"code": 0, "message": "success", "data": {...}}`。
+2. When 匿名用户请求信号列表, the Signal Platform shall 返回基础字段（`strategy_id`、`pair`、`timeframe`、`direction`、`signal_at`），隐藏 `confidence_score`（置信度）字段。
+3. Where VIP1 及以上会员已登录, the Signal Platform shall 在响应中额外返回 `confidence_score`（置信度）字段。
 5. When 请求的 `strategy_id` 不存在, the Signal Platform shall 返回 `{"code": 3001, "message": "策略不存在", "data": null}` 及 HTTP 404。
 6. The Signal Platform shall 对信号列表接口支持分页查询（`page` / `page_size`），`page_size` 默认 20，最大 100。
 7. While 信号数据正常存在于数据库, the Signal Platform shall 在 100ms 内返回单次信号查询响应（不包含外部 I/O 超时）。
