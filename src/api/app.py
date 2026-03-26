@@ -16,6 +16,7 @@ from contextlib import asynccontextmanager
 import sqlalchemy
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
 
 from src.core.exception_handlers import (
     app_error_handler,
@@ -78,6 +79,18 @@ def create_app_with_lifespan() -> FastAPI:
         description="strategy_platform_service — 面向数字货币量化交易入门用户的策略科普展示平台",
         version="1.0.0",
         lifespan=_lifespan,
+    )
+
+    # CORS 中间件 — 允许前端跨域访问
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=[
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+        ],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
     )
 
     # 注册全局异常处理器
