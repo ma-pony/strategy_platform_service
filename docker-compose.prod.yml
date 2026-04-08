@@ -29,6 +29,8 @@ services:
     depends_on:
       migrate:
         condition: service_completed_successfully
+    volumes:
+      - /opt/freqtrade_data:/opt/freqtrade_data
     command: uvicorn src.main:app --host 0.0.0.0 --port 8000
 
   celery-worker:
@@ -49,6 +51,8 @@ services:
       --loglevel=info
       --concurrency=1
       -Q backtest,signal
+    volumes:
+      - /opt/freqtrade_data:/opt/freqtrade_data
 
   celery-beat:
     build: .
