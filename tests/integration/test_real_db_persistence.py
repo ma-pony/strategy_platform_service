@@ -68,7 +68,7 @@ class TestBacktestPersistence:
             strategy_id=strategy.id,
             scheduled_date=datetime.date(2024, 6, 1),
             status=TaskStatus.DONE,
-            timerange="20240101-20240601",
+            timerange="20180101-",
         )
         real_db_session.add(task)
         await real_db_session.flush()  # 获取 task.id

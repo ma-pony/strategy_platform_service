@@ -117,7 +117,9 @@
       "Bash(pre-commit run:*)",
       "Bash(pre-commit install:*)",
       "WebFetch(domain:www.freqtrade.io)",
-      "Bash(pyenv versions:*)"
+      "Bash(pyenv versions:*)",
+      "Bash(docker compose:*)",
+      "Bash(make migrate:*)"
     ]
   },
   "enableAllProjectMcpServers": true,
