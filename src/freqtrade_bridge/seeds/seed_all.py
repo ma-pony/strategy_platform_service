@@ -340,12 +340,30 @@ def seed_all(session: Session) -> dict[str, int]:
             period_start = now - datetime.timedelta(days=365)
             period_end = now
 
+        # total_return：所有交易对的按交易数加权平均
+        weighted_return = 0.0
+        total_tc = sum(m["trade_count"] for m in all_pair_metrics[class_name])
+        if total_tc > 0:
+            for m in all_pair_metrics[class_name]:
+                weighted_return += m["total_return"] * m["trade_count"]
+            weighted_return /= total_tc
+        total_return_value = round(weighted_return, 6)
+
+        # annual_return：从 total_return 和回测周期反算 CAGR
+        #   CAGR = (1 + total_return)^(365.25 / days) - 1
+        days = max((period_end - period_start).days, 1)
+        base = 1.0 + total_return_value
+        if base <= 0:
+            annual_return_value = -1.0  # 完全亏损
+        else:
+            annual_return_value = round(base ** (365.25 / days) - 1.0, 6)
+
         # 创建 BacktestResult
         result = BacktestResult(
             strategy_id=strategy_id,
             task_id=task.id,
-            total_return=agg.get("sharpe_ratio", 0.0),  # 使用汇总值
-            annual_return=0.0,
+            total_return=total_return_value,
+            annual_return=annual_return_value,
             sharpe_ratio=agg["sharpe_ratio"],
             max_drawdown=agg["max_drawdown"],
             trade_count=agg["trade_count"],
@@ -353,14 +371,6 @@ def seed_all(session: Session) -> dict[str, int]:
             period_start=period_start,
             period_end=period_end,
         )
-        # total_return 应该用所有交易对的加权平均
-        weighted_return = 0.0
-        total_tc = sum(m["trade_count"] for m in all_pair_metrics[class_name])
-        if total_tc > 0:
-            for m in all_pair_metrics[class_name]:
-                weighted_return += m["total_return"] * m["trade_count"]
-            weighted_return /= total_tc
-        result.total_return = round(weighted_return, 6)
 
         session.add(result)
         session.flush()
@@ -383,9 +393,11 @@ def seed_all(session: Session) -> dict[str, int]:
             session.add(spm)
             counts["pair_metrics"] += 1
 
-        # 更新策略表汇总指标
+        # 更新策略表汇总指标（与 BacktestResult 保持同步，用于首页榜单接口）
         strategy = session.get(Strategy, strategy_id)
         if strategy is not None:
+            strategy.total_return = total_return_value
+            strategy.annual_return = annual_return_value
             strategy.trade_count = agg["trade_count"]
             strategy.max_drawdown = agg["max_drawdown"]
             strategy.sharpe_ratio = agg["sharpe_ratio"]

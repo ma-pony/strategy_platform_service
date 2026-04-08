@@ -26,3 +26,5 @@ htmlcov/
 
 # mypy 缓存
 .mypy_cache/
+freqtrade_data_local/
+user_data/

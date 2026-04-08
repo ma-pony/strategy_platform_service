@@ -34,7 +34,8 @@ class TestStrategyReadAnonymous:
         assert result["pairs"] == ["BTC/USDT"]
         assert result["strategy_type"] == "mean_reversion"
 
-    def test_anonymous_cannot_see_free_fields(self) -> None:
+    def test_anonymous_sees_ranking_metrics(self) -> None:
+        """首页榜单的 4 个核心指标对匿名用户可见（付费墙下移到 BacktestResultRead）。"""
         schema = StrategyRead(
             id=1,
             name="RSI Strategy",
@@ -47,28 +48,13 @@ class TestStrategyReadAnonymous:
             win_rate=0.6,
         )
         result = schema.model_dump(context={"membership": None})
-        # Free 等级字段不应出现或应为 null
-        assert result.get("trade_count") is None
-        assert result.get("max_drawdown") is None
-
-    def test_anonymous_cannot_see_vip_fields(self) -> None:
-        schema = StrategyRead(
-            id=1,
-            name="RSI Strategy",
-            description="RSI 均值回归",
-            pairs=["BTC/USDT"],
-            strategy_type="mean_reversion",
-            trade_count=100,
-            max_drawdown=0.15,
-            sharpe_ratio=1.5,
-            win_rate=0.6,
-        )
-        result = schema.model_dump(context={"membership": None})
-        assert result.get("sharpe_ratio") is None
-        assert result.get("win_rate") is None
+        assert result["trade_count"] == 100
+        assert result["max_drawdown"] == pytest.approx(0.15)
+        assert result["sharpe_ratio"] == pytest.approx(1.5)
+        assert result["win_rate"] == pytest.approx(0.6)
 
     def test_no_context_treated_as_anonymous(self) -> None:
-        """未提供 context 时，以匿名等级处理。"""
+        """未提供 context 时以匿名等级处理，但榜单字段仍可见。"""
         schema = StrategyRead(
             id=1,
             name="RSI Strategy",
@@ -79,12 +65,12 @@ class TestStrategyReadAnonymous:
             win_rate=0.7,
         )
         result = schema.model_dump()
-        assert result.get("sharpe_ratio") is None
-        assert result.get("win_rate") is None
+        assert result["sharpe_ratio"] == pytest.approx(2.0)
+        assert result["win_rate"] == pytest.approx(0.7)
 
 
 class TestStrategyReadFree:
-    """Free 用户访问 StrategyRead 时额外返回中级字段。"""
+    """Free 用户访问 StrategyRead 时的字段可见性（现已与匿名一致，榜单字段全可见）。"""
 
     def test_free_user_sees_trade_count_and_max_drawdown(self) -> None:
         schema = StrategyRead(
@@ -102,7 +88,8 @@ class TestStrategyReadFree:
         assert result["trade_count"] == 200
         assert result["max_drawdown"] == pytest.approx(0.20)
 
-    def test_free_user_cannot_see_vip_fields(self) -> None:
+    def test_free_user_sees_all_ranking_fields(self) -> None:
+        """Free 用户同样能看到 sharpe_ratio/win_rate（首页榜单核心指标已对全量访客开放）。"""
         schema = StrategyRead(
             id=2,
             name="MACD Strategy",
@@ -113,8 +100,8 @@ class TestStrategyReadFree:
             win_rate=0.55,
         )
         result = schema.model_dump(context={"membership": MembershipTier.FREE})
-        assert result.get("sharpe_ratio") is None
-        assert result.get("win_rate") is None
+        assert result["sharpe_ratio"] == pytest.approx(2.0)
+        assert result["win_rate"] == pytest.approx(0.55)
 
 
 class TestStrategyReadVIP:

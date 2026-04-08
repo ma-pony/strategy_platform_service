@@ -80,9 +80,9 @@ class StrategyRead(BaseModel):
     """策略详情响应 Schema，支持按会员等级过滤字段。
 
     字段等级：
-      - 匿名可见：id, name, description, pairs, strategy_type
-      - Free 可见（min_tier="free"）：trade_count, max_drawdown
-      - VIP 专属（min_tier="vip1"）：sharpe_ratio, win_rate
+      - 匿名可见：id, name, description, pairs, strategy_type,
+        trade_count, max_drawdown, sharpe_ratio, win_rate
+        （首页榜单的 4 个核心指标面向全量访客，tier 付费墙统一在 BacktestResultRead）
 
     使用 model_dump(context={"membership": tier}) 触发字段过滤。
     未提供 context 时以匿名等级处理。
@@ -95,25 +95,13 @@ class StrategyRead(BaseModel):
     pairs: list[str]
     strategy_type: str
 
-    # Free 可见字段
-    trade_count: int | None = Field(
-        default=None,
-        json_schema_extra={"min_tier": "free"},
-    )
-    max_drawdown: float | None = Field(
-        default=None,
-        json_schema_extra={"min_tier": "free"},
-    )
-
-    # VIP 专属字段
-    sharpe_ratio: float | None = Field(
-        default=None,
-        json_schema_extra={"min_tier": "vip1"},
-    )
-    win_rate: float | None = Field(
-        default=None,
-        json_schema_extra={"min_tier": "vip1"},
-    )
+    # 首页榜单核心指标（全量访客可见）
+    total_return: float | None = None
+    annual_return: float | None = None
+    trade_count: int | None = None
+    max_drawdown: float | None = None
+    sharpe_ratio: float | None = None
+    win_rate: float | None = None
 
     model_config = {"from_attributes": True}
 
@@ -136,13 +124,13 @@ class StrategyRead(BaseModel):
             extra = field_info.json_schema_extra
             if not isinstance(extra, dict):
                 continue
-            min_tier_str: str | None = extra.get("min_tier")
-            if min_tier_str is None:
+            min_tier_raw = extra.get("min_tier")
+            if not isinstance(min_tier_raw, str):
                 continue
 
             # 将 min_tier 字符串映射为枚举
             try:
-                min_tier = MembershipTier(min_tier_str)
+                min_tier = MembershipTier(min_tier_raw)
             except ValueError:
                 continue
 
@@ -218,11 +206,11 @@ class BacktestResultRead(BaseModel):
             extra = field_info.json_schema_extra
             if not isinstance(extra, dict):
                 continue
-            min_tier_str: str | None = extra.get("min_tier")
-            if min_tier_str is None:
+            min_tier_raw = extra.get("min_tier")
+            if not isinstance(min_tier_raw, str):
                 continue
             try:
-                min_tier = MembershipTier(min_tier_str)
+                min_tier = MembershipTier(min_tier_raw)
             except ValueError:
                 continue
             if user_tier_idx < _tier_index(min_tier):
@@ -274,11 +262,11 @@ class SignalRead(BaseModel):
             extra = field_info.json_schema_extra
             if not isinstance(extra, dict):
                 continue
-            min_tier_str: str | None = extra.get("min_tier")
-            if min_tier_str is None:
+            min_tier_raw = extra.get("min_tier")
+            if not isinstance(min_tier_raw, str):
                 continue
             try:
-                min_tier = MembershipTier(min_tier_str)
+                min_tier = MembershipTier(min_tier_raw)
             except ValueError:
                 continue
             if user_tier_idx < _tier_index(min_tier):

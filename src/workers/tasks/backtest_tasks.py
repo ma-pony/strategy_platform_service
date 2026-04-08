@@ -203,9 +203,10 @@ def run_backtest_task(self: Any, strategy_id: int) -> None:  # type: ignore[misc
             _insert_backtest_signals(session, strategy_id, signals)
 
             # 11.5 在 commit 前写入策略对绩效指标（与 BacktestResult 同一事务，需求 2.5）
-            # 从策略配置获取 pair 和 timeframe（取第一个交易对）
+            # timeframe 优先取 freqtrade 回测结果中解析出的真实周期，
+            # 回退到 strategy.config_params，再兜底 "1h"（避免策略文件改 1d 后这里仍写 1h）
             pairs = strategy.pairs if hasattr(strategy, "pairs") and strategy.pairs else []
-            timeframe_val = (
+            timeframe_val = backtest_output.get("timeframe") or (
                 strategy.config_params.get("timeframe", "1h")
                 if hasattr(strategy, "config_params") and strategy.config_params
                 else "1h"
@@ -355,21 +356,26 @@ def _upsert_metrics_for_backtest(
 
 
 def _update_strategy_metrics(strategy: Any, result_data: dict[str, Any]) -> None:
-    """DONE 后更新 Strategy 表 NULL 指标字段为回测结果值。
+    """DONE 后总是用最新一次回测结果覆盖 Strategy 表的指标字段。
 
-    非 NULL 字段不覆盖。
+    覆盖语义：每次真实回测成功后用最新结果刷新首页榜单展示值。
+    调用位置在事务 commit 之前，失败会整体回滚，不会写入脏数据。
+    result_data 中对应 key 缺失时跳过（不写入 None，保留既有值）。
     """
     field_mapping = {
+        "total_return": "total_return",
+        "annual_return": "annual_return",
         "trade_count": "trade_count",
         "max_drawdown": "max_drawdown",
         "sharpe_ratio": "sharpe_ratio",
         "win_rate": "win_rate",
     }
     for result_key, strategy_field in field_mapping.items():
-        if hasattr(strategy, strategy_field):
-            current_value = getattr(strategy, strategy_field, None)
-            if current_value is None:
-                setattr(strategy, strategy_field, result_data.get(result_key))
+        if not hasattr(strategy, strategy_field):
+            continue
+        if result_key not in result_data:
+            continue
+        setattr(strategy, strategy_field, result_data[result_key])
 
 
 def _insert_backtest_signals(

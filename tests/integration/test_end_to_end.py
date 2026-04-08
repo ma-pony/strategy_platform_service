@@ -109,9 +109,9 @@ class TestAnonymousAccess:
         # 基础字段可见
         assert item["id"] == 1
         assert item["name"] == "Strategy 1"
-        # VIP 字段不可见
-        assert item.get("sharpe_ratio") is None
-        assert item.get("win_rate") is None
+        # 首页榜单 4 字段对匿名也可见（付费墙下移到 BacktestResultRead）
+        assert item["sharpe_ratio"] == pytest.approx(2.5)
+        assert item["win_rate"] == pytest.approx(0.65)
 
     async def test_anonymous_can_access_reports_list(self, client: AsyncClient, app) -> None:
         """匿名用户可访问研报列表（无需登录）。"""
@@ -173,12 +173,11 @@ class TestMembershipFieldVisibility:
 
         assert response.status_code == 200
         item = response.json()["data"]
-        # Free 用户可见中级指标
+        # 首页榜单 4 字段对 Free 用户全部可见（付费墙下移到 BacktestResultRead）
         assert item["trade_count"] == 100
         assert item["max_drawdown"] == pytest.approx(0.12)
-        # VIP 字段不可见
-        assert item.get("sharpe_ratio") is None
-        assert item.get("win_rate") is None
+        assert item["sharpe_ratio"] == pytest.approx(2.5)
+        assert item["win_rate"] == pytest.approx(0.65)
 
     async def test_vip_user_sees_all_fields(self, client: AsyncClient, app) -> None:
         """VIP 用户访问策略详情，所有高级指标均可见。"""

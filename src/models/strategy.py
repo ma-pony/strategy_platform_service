@@ -31,6 +31,8 @@ class Strategy(Base, TimestampMixin):
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
 
     # 回测结果指标（由 backtest_tasks DONE 后自动填充 NULL 字段）
+    total_return: Mapped[float | None] = mapped_column(Float, nullable=True, default=None)
+    annual_return: Mapped[float | None] = mapped_column(Float, nullable=True, default=None)
     trade_count: Mapped[int | None] = mapped_column(Integer, nullable=True, default=None)
     max_drawdown: Mapped[float | None] = mapped_column(Float, nullable=True, default=None)
     sharpe_ratio: Mapped[float | None] = mapped_column(Float, nullable=True, default=None)

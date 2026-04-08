@@ -227,8 +227,8 @@ class TestStrategyDetailEndpoint:
         assert item.get("trade_count") is None
 
     @pytest.mark.asyncio
-    async def test_free_user_sees_free_tier_fields_not_vip(self, client: AsyncClient, app) -> None:
-        """Free 用户访问策略详情：Free 字段可见，VIP 字段不可见。"""
+    async def test_free_user_sees_all_ranking_fields(self, client: AsyncClient, app) -> None:
+        """Free 用户访问策略详情：首页榜单 4 字段全部可见（付费墙已下移到 BacktestResultRead）。"""
         from src.core.deps import get_db, get_optional_user
         from src.core.enums import MembershipTier
 
@@ -264,12 +264,10 @@ class TestStrategyDetailEndpoint:
 
         assert response.status_code == 200
         item = response.json()["data"]
-        # Free 用户可见 trade_count 和 max_drawdown
         assert item["trade_count"] == 100
         assert item["max_drawdown"] == pytest.approx(0.12)
-        # VIP 字段不可见
-        assert item.get("sharpe_ratio") is None
-        assert item.get("win_rate") is None
+        assert item["sharpe_ratio"] == pytest.approx(2.5)
+        assert item["win_rate"] == pytest.approx(0.65)
 
     @pytest.mark.asyncio
     async def test_page_size_over_limit_returns_422_code_2001(self, client: AsyncClient, app) -> None:
@@ -385,8 +383,8 @@ class TestStrategyListFieldVisibility:
     """GET /api/v1/strategies 列表接口字段可见性补充测试（审计批次 1）。"""
 
     @pytest.mark.asyncio
-    async def test_free_user_sees_free_fields_not_vip_in_list(self, client: AsyncClient, app) -> None:
-        """Free 用户访问策略列表：trade_count / max_drawdown 可见，sharpe_ratio / win_rate 为 null。"""
+    async def test_free_user_sees_all_ranking_fields_in_list(self, client: AsyncClient, app) -> None:
+        """Free 用户访问策略列表：首页榜单 4 字段全部可见。"""
         from src.core.deps import get_db, get_optional_user
         from src.core.enums import MembershipTier
 
@@ -423,8 +421,8 @@ class TestStrategyListFieldVisibility:
         item = response.json()["data"]["items"][0]
         assert item["trade_count"] == 80
         assert item["max_drawdown"] == pytest.approx(0.15)
-        assert item.get("sharpe_ratio") is None
-        assert item.get("win_rate") is None
+        assert item["sharpe_ratio"] == pytest.approx(1.8)
+        assert item["win_rate"] == pytest.approx(0.55)
 
     @pytest.mark.asyncio
     async def test_vip1_user_sees_all_fields_in_list(self, client: AsyncClient, app) -> None:

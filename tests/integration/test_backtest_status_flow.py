@@ -511,8 +511,11 @@ class TestBacktestSignalInsert:
             assert first_word != "DELETE", f"不应执行 DELETE 语句，但执行了：{sql_str[:100]}"
 
 
-class TestStrategyNullFieldUpdate:
-    """验证 Strategy NULL 字段在 DONE 后被回测结果填充，非 NULL 字段不被覆盖。"""
+class TestStrategyMetricsUpdate:
+    """验证 Strategy 指标字段在每次真实回测 DONE 后总是被最新结果刷新。
+
+    原语义是"只填 NULL"，已改为"总是覆盖"——这样首页榜单才会随新回测持续更新。
+    """
 
     def test_null_strategy_fields_populated_after_done(self, env_setup) -> None:
         """Strategy 中为 NULL 的指标字段应被回测结果填充。"""
@@ -558,8 +561,8 @@ class TestStrategyNullFieldUpdate:
         assert mock_strategy.sharpe_ratio == pytest.approx(2.1), "NULL 的 sharpe_ratio 应被填充"
         assert mock_strategy.win_rate == pytest.approx(0.65), "NULL 的 win_rate 应被填充"
 
-    def test_non_null_strategy_fields_not_overwritten(self, env_setup) -> None:
-        """Strategy 中非 NULL 的指标字段不应被回测结果覆盖。"""
+    def test_non_null_strategy_fields_overwritten_with_new_values(self, env_setup) -> None:
+        """Strategy 中非 NULL 的指标字段也应被最新回测结果覆盖（新"总是覆盖"语义）。"""
         from src.models.backtest import BacktestTask
         from src.workers.tasks.backtest_tasks import run_backtest_task
 
@@ -569,8 +572,8 @@ class TestStrategyNullFieldUpdate:
         mock_strategy = _make_mock_strategy(
             trade_count=None,  # NULL，应被填充
             max_drawdown=None,  # NULL，应被填充
-            sharpe_ratio=original_sharpe,  # 非 NULL，不应被覆盖
-            win_rate=original_win_rate,  # 非 NULL，不应被覆盖
+            sharpe_ratio=original_sharpe,  # 旧值，应被新回测覆盖
+            win_rate=original_win_rate,  # 旧值，应被新回测覆盖
         )
 
         mock_session = _make_mock_session()
@@ -602,19 +605,20 @@ class TestStrategyNullFieldUpdate:
         assert mock_strategy.trade_count == 120, "NULL 的 trade_count 应被填充"
         assert mock_strategy.max_drawdown == pytest.approx(0.08), "NULL 的 max_drawdown 应被填充"
 
-        # 验证非 NULL 字段未被覆盖
-        assert mock_strategy.sharpe_ratio == pytest.approx(original_sharpe), (
-            f"非 NULL 的 sharpe_ratio ({original_sharpe}) 不应被覆盖"
+        # 验证非 NULL 字段也被新回测结果覆盖（防回退关键断言）
+        assert mock_strategy.sharpe_ratio == pytest.approx(2.1), (
+            f"旧 sharpe_ratio ({original_sharpe}) 应被新回测值 2.1 覆盖"
         )
-        assert mock_strategy.win_rate == pytest.approx(original_win_rate), (
-            f"非 NULL 的 win_rate ({original_win_rate}) 不应被覆盖"
+        assert mock_strategy.win_rate == pytest.approx(0.65), (
+            f"旧 win_rate ({original_win_rate}) 应被新回测值 0.65 覆盖"
         )
 
-    def test_all_non_null_fields_unchanged(self, env_setup) -> None:
-        """所有字段均非 NULL 时，Strategy 不被修改。"""
+    def test_all_fields_overwritten_regardless_of_previous_values(self, env_setup) -> None:
+        """所有字段均非 NULL 时，Strategy 的所有指标仍然被最新回测结果覆盖。"""
         from src.models.backtest import BacktestTask
         from src.workers.tasks.backtest_tasks import run_backtest_task
 
+        # 故意用与回测输出完全不同的旧 seed 值
         original_values = {
             "trade_count": 200,
             "max_drawdown": 0.15,
@@ -648,11 +652,11 @@ class TestStrategyNullFieldUpdate:
                         with patch("src.workers.tasks.backtest_tasks.cleanup_task_dir"):
                             run_backtest_task(strategy_id=1)
 
-        # 所有字段应保持原值
-        assert mock_strategy.trade_count == 200
-        assert mock_strategy.max_drawdown == pytest.approx(0.15)
-        assert mock_strategy.sharpe_ratio == pytest.approx(1.5)
-        assert mock_strategy.win_rate == pytest.approx(0.55)
+        # 所有字段都应被回测结果覆盖（防回退关键断言）
+        assert mock_strategy.trade_count == 120
+        assert mock_strategy.max_drawdown == pytest.approx(0.08)
+        assert mock_strategy.sharpe_ratio == pytest.approx(2.1)
+        assert mock_strategy.win_rate == pytest.approx(0.65)
 
 
 class TestBacktestTempDirCleanup:

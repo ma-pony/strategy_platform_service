@@ -45,7 +45,9 @@ def run_backtest_subprocess(
         FreqtradeExecutionError: 非零退出码或其他执行错误
     """
     task_dir = config_path.parent
-    results_dir = task_dir / "results"
+    # freqtrade 默认把结果写到 {userdir}/backtest_results/，
+    # 这里用 userdir=task_dir，所以结果会出现在 task_dir/backtest_results/。
+    results_dir = task_dir / "backtest_results"
     results_dir.mkdir(parents=True, exist_ok=True)
 
     # 从配置文件中读取参数
@@ -63,8 +65,6 @@ def run_backtest_subprocess(
         strategy,
         "--export",
         "trades",
-        "--backtest-directory",
-        str(results_dir),
         "--userdir",
         str(task_dir),
     ]
@@ -127,28 +127,38 @@ def _parse_backtest_result(results_dir: Path, strategy: str) -> dict[str, Any]:
     total_trades = strategy_data.get("total_trades", len(trades))
     winning_trades = sum(1 for t in trades if t.get("profit_ratio", 0) > 0)
 
+    # trading_signals.timeframe 是 NOT NULL，从策略数据读取，兜底 1h
+    timeframe = strategy_data.get("timeframe") or "1h"
+
     # 将 trades 转换为信号记录
-    signals = _trades_to_signals(trades)
+    signals = _trades_to_signals(trades, timeframe=timeframe)
 
     return {
+        # freqtrade profit_total 为比率（profit_abs.sum() / start_balance）
         "total_return": strategy_data.get("profit_total", 0.0) or 0.0,
-        "annual_return": strategy_data.get("profit_total_abs", 0.0) or 0.0,
+        # 年化收益必须用 cagr（复合年增长率），不能用 profit_total_abs（绝对利润金额）
+        "annual_return": strategy_data.get("cagr", 0.0) or 0.0,
         "sharpe_ratio": strategy_data.get("sharpe", 0.0) or 0.0,
-        "max_drawdown": strategy_data.get("max_drawdown_abs", 0.0) or 0.0,
+        # 最大回撤必须用 max_drawdown_account（relative_account_drawdown，比率），
+        # 不能用 max_drawdown_abs（drawdown_abs，币种绝对金额），
+        # 否则会与 seed 写入的 ratio 语义不一致，单位混乱。
+        "max_drawdown": strategy_data.get("max_drawdown_account", 0.0) or 0.0,
         "trade_count": total_trades,
         "win_rate": (winning_trades / total_trades) if total_trades > 0 else 0.0,
         "period_start": strategy_data.get("backtest_start", ""),
         "period_end": strategy_data.get("backtest_end", ""),
+        "timeframe": timeframe,
         "signals": signals,
     }
 
 
-def _trades_to_signals(trades: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _trades_to_signals(trades: list[dict[str, Any]], timeframe: str = "1h") -> list[dict[str, Any]]:
     """将 freqtrade 回测 trades 转换为 trading_signals 格式。
 
     每笔 trade 的入场动作转为一条 buy/sell 信号。
     confidence_score 和 signal_strength 基于入场时可获取的信息计算，
     不使用事后利润（避免前瞻偏差）。
+    timeframe 由调用方从回测配置透传（trading_signals.timeframe NOT NULL）。
     """
     signals = []
     for trade in trades:
@@ -169,7 +179,7 @@ def _trades_to_signals(trades: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 "entry_price": trade.get("open_rate"),
                 "stop_loss": trade.get("stop_loss_abs"),
                 "take_profit": trade.get("close_rate"),
-                "timeframe": None,
+                "timeframe": timeframe,
                 "signal_strength": signal_strength,
                 "volume": trade.get("stake_amount"),
                 "volatility": None,

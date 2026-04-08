@@ -487,24 +487,25 @@ class TestStrategyListRealDB:
         assert len(data2["items"]) == 1  # 第 3 页只有 1 条
 
     @pytest.mark.asyncio
-    async def test_list_anonymous_hides_vip_fields(self, client: AsyncClient, db_session: AsyncSession) -> None:
-        """匿名用户看不到 VIP 字段（sharpe_ratio, win_rate 为 null）。"""
+    async def test_list_anonymous_sees_ranking_fields(self, client: AsyncClient, db_session: AsyncSession) -> None:
+        """首页榜单 4 字段对匿名用户全量可见（付费墙已下移到 BacktestResultRead）。"""
         strategy = await _create_strategy(db_session, name="VipStrat")
         strategy.sharpe_ratio = 1.5
         strategy.win_rate = 0.65
         strategy.trade_count = 100
+        strategy.max_drawdown = 0.2
         await db_session.commit()
 
         resp = await client.get("/api/v1/strategies")
         item = resp.json()["data"]["items"][0]
-        assert item["sharpe_ratio"] is None
-        assert item["win_rate"] is None
-        # 匿名也看不到 Free 字段
-        assert item["trade_count"] is None
+        assert item["sharpe_ratio"] == pytest.approx(1.5)
+        assert item["win_rate"] == pytest.approx(0.65)
+        assert item["trade_count"] == 100
+        assert item["max_drawdown"] == pytest.approx(0.2)
 
     @pytest.mark.asyncio
-    async def test_list_free_user_sees_free_fields(self, client: AsyncClient, db_session: AsyncSession) -> None:
-        """Free 用户可见 trade_count, max_drawdown；不可见 sharpe_ratio, win_rate。"""
+    async def test_list_free_user_sees_all_ranking_fields(self, client: AsyncClient, db_session: AsyncSession) -> None:
+        """Free 用户同样能看到榜单全部 4 个指标。"""
         await _create_user(
             db_session,
             email="freeuser@example.com",
@@ -526,8 +527,8 @@ class TestStrategyListRealDB:
         item = resp.json()["data"]["items"][0]
         assert item["trade_count"] == 50
         assert item["max_drawdown"] == pytest.approx(0.1)
-        assert item["sharpe_ratio"] is None
-        assert item["win_rate"] is None
+        assert item["sharpe_ratio"] == pytest.approx(2.0)
+        assert item["win_rate"] == pytest.approx(0.7)
 
     @pytest.mark.asyncio
     async def test_list_vip1_user_sees_all_fields(self, client: AsyncClient, db_session: AsyncSession) -> None:

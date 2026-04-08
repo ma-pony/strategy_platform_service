@@ -162,6 +162,8 @@ class SignalCalculator:
 
                 for pair in pairs:
                     for timeframe in timeframes:
+                        # 每组合独立 SAVEPOINT，失败回滚到组合边界不影响其他组合
+                        savepoint = session.begin_nested()
                         try:
                             # 加载 OHLCV 数据（内存缓存复用）
                             df = self._load_ohlcv_from_datadir(datadir, pair, timeframe)
@@ -181,12 +183,15 @@ class SignalCalculator:
                                 signal_data=signal_data,
                             )
 
-                            # 更新 Redis 缓存
+                            savepoint.commit()
+
+                            # Redis 更新放在 SAVEPOINT 提交后（Redis 失败静默不影响 DB）
                             self._update_redis_cache(strategy_id, pair, timeframe, signal_data)
 
                             success_count += 1
 
                         except Exception as exc:
+                            savepoint.rollback()
                             failure_count += 1
                             failed_combinations.append((strategy_name, pair, timeframe))
                             logger.error(
@@ -197,8 +202,14 @@ class SignalCalculator:
                                 timeframe=timeframe,
                                 error=str(exc),
                             )
+
+            # 所有组合处理完后统一提交外层事务（需求 2.6）
+            session.commit()
+        except Exception:
+            session.rollback()
+            raise
         finally:
-            pass
+            session.close()
 
         elapsed = time.monotonic() - start_time
 
@@ -372,7 +383,7 @@ class SignalCalculator:
             VALUES
                 (:strategy_id, :pair, :timeframe, :direction, :confidence_score,
                  :signal_source, :signal_at, :created_at)
-            ON CONFLICT (strategy_id, pair, timeframe)
+            ON CONFLICT (strategy_id, pair, timeframe) WHERE signal_source = 'realtime'
             DO UPDATE SET
                 direction = EXCLUDED.direction,
                 confidence_score = EXCLUDED.confidence_score,
