@@ -10,19 +10,16 @@ from pandas import DataFrame
 class RsiMeanReversionStrategy(IStrategy):
     INTERFACE_VERSION = 3
 
-    timeframe = "1h"
-    can_short: bool = True
+    timeframe = "1d"
+    can_short: bool = False
 
     minimal_roi = {
-        "0": 0.094,
-        "21": 0.069,
-        "63": 0.018,
-        "147": 0,
+        "0": 100,
     }
 
-    stoploss = -0.271
+    stoploss = -0.15
     trailing_stop = False
-    use_custom_stoploss = True
+    use_custom_stoploss = False
 
     process_only_new_candles = True
     use_exit_signal = True
@@ -160,21 +157,11 @@ class RsiMeanReversionStrategy(IStrategy):
 
         max_profit = trade.max_profit if hasattr(trade, "max_profit") else current_profit
 
-        if max_profit > 0.05 and (max_profit - current_profit) > 0.03:
-            return "trailing_profit_3pct"
-        if max_profit > 0.10 and (max_profit - current_profit) > 0.04:
-            return "trailing_profit_4pct"
-        if max_profit > 0.15 and (max_profit - current_profit) > 0.05:
-            return "trailing_profit_5pct"
-
-        if current_profit > 0.10:
-            return "take_profit_10"
-        if current_profit > 0.05:
-            return "take_profit_5"
-
-        hold_hours = (current_time - trade.open_date_utc).total_seconds() / 3600
-        if hold_hours > 24 and current_profit > 0.02:
-            return "time_exit_profit"
+        # 只在高盈利位置回撤时才出，给趋势足够空间
+        if max_profit > 0.40 and (max_profit - current_profit) > 0.15:
+            return "trailing_profit_15pct"
+        if max_profit > 0.20 and (max_profit - current_profit) > 0.10:
+            return "trailing_profit_10pct"
 
         return None
 

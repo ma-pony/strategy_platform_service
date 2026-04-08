@@ -2,7 +2,8 @@
   "trading_mode": "spot",
   "margin_mode": "",
   "stake_currency": "USDT",
-  "stake_amount": 100,
+  "stake_amount": "unlimited",
+  "max_open_trades": 5,
   "tradable_balance_ratio": 0.99,
   "dry_run": true,
   "dry_run_wallet": 10000,
@@ -10,7 +11,10 @@
     "name": "binance",
     "pair_whitelist": [
       "BTC/USDT",
-      "ETH/USDT"
+      "ETH/USDT",
+      "BNB/USDT",
+      "SOL/USDT",
+      "XRP/USDT"
     ]
   },
   "pairlists": [
@@ -28,7 +32,7 @@
     "use_order_book": true,
     "order_book_top": 1
   },
-  "timeframe": "1h",
+  "timeframe": "1d",
   "timerange": "{{TIMERANGE}}",
   "datadir": "{{DATADIR}}",
   "strategy_path": "{{STRATEGY_PATH}}",
