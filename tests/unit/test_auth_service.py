@@ -268,7 +268,7 @@ class TestRefreshAccessToken:
         """refresh_token 过期时抛出 AuthenticationError。"""
         from datetime import datetime, timedelta, timezone
 
-        from jose import jwt
+        import jwt
 
         from src.core.exceptions import AuthenticationError
 

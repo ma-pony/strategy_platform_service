@@ -14,7 +14,8 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import bcrypt
-from jose import JWTError, jwt
+import jwt
+from jwt import PyJWTError
 
 from src.core.app_settings import get_settings
 from src.core.enums import MembershipTier
@@ -94,7 +95,7 @@ class SecurityUtils:
                 self._get_secret_key(),
                 algorithms=[_ALGORITHM],
             )
-        except JWTError:
+        except PyJWTError:
             raise AuthenticationError("token 无效或已过期") from None
 
         if payload.get("type") != expected_type:

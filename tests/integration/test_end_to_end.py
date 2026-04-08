@@ -311,7 +311,7 @@ class TestErrorScenarios:
         """过期 token 请求时返回 code:1001 HTTP 401。"""
         from datetime import timedelta
 
-        from jose import jwt
+        import jwt
 
         from src.api.main_router import create_app
         from src.core.deps import get_db

@@ -122,7 +122,7 @@ class TestDecodeToken:
         from datetime import datetime, timedelta, timezone
 
         # 手动创建过期 token
-        from jose import jwt
+        import jwt
 
         from src.core.enums import MembershipTier
         from src.core.exceptions import AuthenticationError
