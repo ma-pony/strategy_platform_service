@@ -33,7 +33,7 @@ _SENSITIVE_KEYS: frozenset[str] = frozenset(
 def generate_config(
     task_dir: Path,
     strategy_config: dict[str, Any],
-    timerange: str = "20240101-20240601",
+    timerange: str = "20180101-",
 ) -> Path:
     """基于模板在隔离目录下生成 freqtrade 配置 JSON 文件。
 

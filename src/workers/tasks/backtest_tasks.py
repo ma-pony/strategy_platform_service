@@ -158,7 +158,7 @@ def run_backtest_task(self: Any, strategy_id: int) -> None:  # type: ignore[misc
             config_path = generate_config(
                 task_dir,
                 strategy.config_params or {},
-                timerange=task_record.timerange or "20240101-20240601",
+                timerange=task_record.timerange or "20180101-",
             )
 
             # 7. 执行 freqtrade 回测子进程（无 timeout 参数）
