@@ -34,6 +34,9 @@ jobs:
             echo ">>> 重新构建 Docker 镜像..."
             docker compose -f docker-compose.prod.yml build
 
+            echo ">>> 执行数据库迁移（在新镜像上一次性运行，失败则终止部署）..."
+            docker compose -f docker-compose.prod.yml run --rm --no-deps --entrypoint "" web alembic upgrade head
+
             echo ">>> 重启应用服务..."
             docker compose -f docker-compose.prod.yml up -d
 

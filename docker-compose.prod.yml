@@ -1,4 +1,21 @@
 services:
+  # 一次性迁移服务：跑 alembic upgrade head 后退出。
+  # web / celery-worker / celery-beat 都 depends_on 它，
+  # 确保 `docker compose up -d` 时任何服务启动前数据库 schema 已是最新。
+  # 失败会导致下游服务不启动（condition: service_completed_successfully）。
+  migrate:
+    build: .
+    container_name: strategy_platform_migrate
+    network_mode: host
+    env_file: .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://postgres:123456@localhost:5432/strategy_platform}
+      DATABASE_SYNC_URL: ${DATABASE_SYNC_URL:-postgresql+psycopg2://postgres:123456@localhost:5432/strategy_platform}
+      REDIS_URL: ${REDIS_URL:-redis://localhost:6379/0}
+    restart: "no"
+    entrypoint: ""
+    command: alembic upgrade head
+
   web:
     build: .
     container_name: strategy_platform_web
@@ -9,9 +26,10 @@ services:
       DATABASE_SYNC_URL: ${DATABASE_SYNC_URL:-postgresql+psycopg2://postgres:123456@localhost:5432/strategy_platform}
       REDIS_URL: ${REDIS_URL:-redis://localhost:6379/0}
     restart: unless-stopped
-    command: >
-      sh -c "alembic upgrade head &&
-             uvicorn src.main:app --host 0.0.0.0 --port 8000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    command: uvicorn src.main:app --host 0.0.0.0 --port 8000
 
   celery-worker:
     build: .
@@ -23,6 +41,9 @@ services:
       DATABASE_SYNC_URL: ${DATABASE_SYNC_URL:-postgresql+psycopg2://postgres:123456@localhost:5432/strategy_platform}
       REDIS_URL: ${REDIS_URL:-redis://localhost:6379/0}
     restart: unless-stopped
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
     command: >
       celery -A src.workers.celery_app:celery_app worker
       --loglevel=info
@@ -39,6 +60,9 @@ services:
       DATABASE_SYNC_URL: ${DATABASE_SYNC_URL:-postgresql+psycopg2://postgres:123456@localhost:5432/strategy_platform}
       REDIS_URL: ${REDIS_URL:-redis://localhost:6379/0}
     restart: unless-stopped
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
     command: >
       celery -A src.workers.celery_app:celery_app beat
       --loglevel=info

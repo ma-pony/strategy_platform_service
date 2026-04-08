@@ -25,6 +25,22 @@ services:
       timeout: 3s
       retries: 5
 
+  # 一次性迁移服务：启动后跑 alembic upgrade head 后退出。
+  # web / celery-worker / celery-beat 都 depends_on 它，确保 schema 最新。
+  migrate:
+    build: .
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/cryptotrader
+      DATABASE_SYNC_URL: postgresql+psycopg2://postgres:postgres@postgres:5432/cryptotrader
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+    entrypoint: ""
+    command: alembic upgrade head
+
   web:
     build: .
     ports:
@@ -39,9 +55,9 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    command: >
-      sh -c "alembic upgrade head &&
-             uvicorn src.main:app --host 0.0.0.0 --port 8000"
+      migrate:
+        condition: service_completed_successfully
+    command: uvicorn src.main:app --host 0.0.0.0 --port 8000
 
   celery-worker:
     build: .
@@ -55,6 +71,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     command: >
       celery -A src.workers.celery_app:celery_app worker
       --loglevel=info
@@ -73,6 +91,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     command: >
       celery -A src.workers.celery_app:celery_app beat
       --loglevel=info
