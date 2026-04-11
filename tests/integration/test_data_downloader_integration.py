@@ -1,21 +1,21 @@
 """任务 9.1 集成测试：DataDownloader + 本地文件集成测试。
 
-使用测试 fixtures 的本地 OHLCV 文件（非真实 Binance 请求）：
+使用测试 fixtures 的本地 OHLCV feather 文件（非真实 Binance 请求）：
   - 验证新鲜度检查正确跳过已有新鲜数据
   - 验证降级逻辑：download-data 子进程失败时，现有本地文件被正确使用
 
 涵盖需求：1.2, 1.9
 """
 
-import json
 import time
 from pathlib import Path
 
+import pandas as pd
 import pytest
 
 
 def _write_ohlcv_fixture(datadir: Path, pair: str, timeframe: str, age_seconds: float = 0) -> Path:
-    """在 datadir 中写入测试用 OHLCV 文件。
+    """在 datadir 中写入测试用 OHLCV feather 文件。
 
     Args:
         datadir: 数据目录
@@ -24,17 +24,22 @@ def _write_ohlcv_fixture(datadir: Path, pair: str, timeframe: str, age_seconds: 
         age_seconds: K 线时间戳距当前的秒数（0=新鲜）
     """
     pair_normalized = pair.replace("/", "_")
-    filename = f"{pair_normalized}-{timeframe}-futures.json"
-    exchange_dir = datadir / "data" / "binance"
-    exchange_dir.mkdir(parents=True, exist_ok=True)
-    file_path = exchange_dir / filename
+    filename = f"{pair_normalized}-{timeframe}.feather"
+    file_path = datadir / filename
+    file_path.parent.mkdir(parents=True, exist_ok=True)
 
-    now_ms = int((time.time() - age_seconds) * 1000)
-    # freqtrade OHLCV 格式：[timestamp_ms, open, high, low, close, volume]
-    ohlcv_data = [
-        [now_ms, 50000.0, 51000.0, 49000.0, 50500.0, 100.0],
-    ]
-    file_path.write_text(json.dumps(ohlcv_data))
+    ts = pd.Timestamp(time.time() - age_seconds, unit="s", tz="UTC")
+    df = pd.DataFrame(
+        {
+            "date": [ts],
+            "open": [50000.0],
+            "high": [51000.0],
+            "low": [49000.0],
+            "close": [50500.0],
+            "volume": [100.0],
+        }
+    )
+    df.to_feather(file_path)
     return file_path
 
 
@@ -45,13 +50,12 @@ class TestDataDownloaderFreshnessIntegration:
         """本地数据足够新鲜时，跳过下载（pairs_skipped 增加）。"""
         from src.freqtrade_bridge.data_downloader import DataDownloader
 
-        # 写入新鲜数据（0 秒前）
-        _write_ohlcv_fixture(tmp_path, "BTC/USDT", "1h", age_seconds=0)
+        _write_ohlcv_fixture(tmp_path, "BTC/USDT", "1d", age_seconds=0)
 
         downloader = DataDownloader()
         result = downloader.download_market_data(
             pairs=["BTC/USDT"],
-            timeframes=["1h"],
+            timeframes=["1d"],
             datadir=tmp_path,
         )
 
@@ -66,12 +70,11 @@ class TestDataDownloaderFreshnessIntegration:
         from src.freqtrade_bridge.data_downloader import DataDownloader
         from src.freqtrade_bridge.exceptions import FreqtradeExecutionError
 
-        # 写入过期数据（比时间周期更旧）
-        _write_ohlcv_fixture(tmp_path, "BTC/USDT", "1h", age_seconds=7200)  # 2h 前
+        # 写入过期数据（3 天前，超过 1d × 2 容差）
+        _write_ohlcv_fixture(tmp_path, "BTC/USDT", "1d", age_seconds=86400 * 3)
 
         downloader = DataDownloader()
 
-        # download-data 子进程失败
         with patch.object(
             downloader,
             "_run_download_subprocess",
@@ -79,11 +82,10 @@ class TestDataDownloaderFreshnessIntegration:
         ):
             result = downloader.download_market_data(
                 pairs=["BTC/USDT"],
-                timeframes=["1h"],
+                timeframes=["1d"],
                 datadir=tmp_path,
             )
 
-        # 本地文件存在 → 降级
         assert result.data_source == "local_fallback"
         assert result.pairs_failed == 0
 
@@ -92,7 +94,7 @@ class TestDataDownloaderFreshnessIntegration:
         from src.freqtrade_bridge.data_downloader import DataDownloader
 
         downloader = DataDownloader()
-        is_fresh = downloader._is_data_fresh(tmp_path, "ETH/USDT", "1h")
+        is_fresh = downloader._is_data_fresh(tmp_path, "ETH/USDT", "1d")
 
         assert is_fresh is False
 
@@ -100,10 +102,10 @@ class TestDataDownloaderFreshnessIntegration:
         """最后一根 K 线在周期内时返回 True。"""
         from src.freqtrade_bridge.data_downloader import DataDownloader
 
-        _write_ohlcv_fixture(tmp_path, "BTC/USDT", "1h", age_seconds=30)
+        _write_ohlcv_fixture(tmp_path, "BTC/USDT", "1d", age_seconds=30)
 
         downloader = DataDownloader()
-        is_fresh = downloader._is_data_fresh(tmp_path, "BTC/USDT", "1h")
+        is_fresh = downloader._is_data_fresh(tmp_path, "BTC/USDT", "1d")
 
         assert is_fresh is True
 
@@ -111,10 +113,11 @@ class TestDataDownloaderFreshnessIntegration:
         """最后一根 K 线超过周期时返回 False。"""
         from src.freqtrade_bridge.data_downloader import DataDownloader
 
-        _write_ohlcv_fixture(tmp_path, "BTC/USDT", "1h", age_seconds=4000)  # > 3600s
+        # 超过 1d × 2 = 172800s
+        _write_ohlcv_fixture(tmp_path, "BTC/USDT", "1d", age_seconds=200000)
 
         downloader = DataDownloader()
-        is_fresh = downloader._is_data_fresh(tmp_path, "BTC/USDT", "1h")
+        is_fresh = downloader._is_data_fresh(tmp_path, "BTC/USDT", "1d")
 
         assert is_fresh is False
 
@@ -132,8 +135,8 @@ class TestDataDownloaderFallbackIntegration:
         from src.freqtrade_bridge.data_downloader import DataDownloader
         from src.freqtrade_bridge.exceptions import FreqtradeExecutionError
 
-        # 写入过期数据（需要更新）
-        _write_ohlcv_fixture(tmp_path, "ETH/USDT", "1h", age_seconds=7200)
+        # 写入过期数据
+        _write_ohlcv_fixture(tmp_path, "ETH/USDT", "1d", age_seconds=86400 * 3)
 
         downloader = DataDownloader()
 
@@ -144,7 +147,7 @@ class TestDataDownloaderFallbackIntegration:
         ):
             result = downloader.download_market_data(
                 pairs=["ETH/USDT"],
-                timeframes=["1h"],
+                timeframes=["1d"],
                 datadir=tmp_path,
             )
 
@@ -172,6 +175,6 @@ class TestDataDownloaderFallbackIntegration:
             with pytest.raises(FreqtradeExecutionError):
                 downloader.download_market_data(
                     pairs=["DOGE/USDT"],
-                    timeframes=["1h"],
+                    timeframes=["1d"],
                     datadir=tmp_path,
                 )

@@ -10,56 +10,62 @@ import subprocess
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import pandas as pd
 import pytest
+
+
+def _write_feather(path: Path, date_str: str) -> None:
+    """写入只含一行的 feather 文件，用于新鲜度检查测试。"""
+    df = pd.DataFrame(
+        {
+            "date": [pd.Timestamp(date_str, tz="UTC")],
+            "open": [50000.0],
+            "high": [51000.0],
+            "low": [49000.0],
+            "close": [50500.0],
+            "volume": [100.0],
+        }
+    )
+    path.parent.mkdir(parents=True, exist_ok=True)
+    df.to_feather(path)
 
 
 class TestDataFreshness:
     """任务 2.1：测试新鲜度检查逻辑（_is_data_fresh）。"""
 
     def test_data_is_fresh_within_current_period(self, tmp_path: Path) -> None:
-        """数据在当前 1h 周期内时，_is_data_fresh 返回 True（跳过下载）。"""
+        """数据在当前 1d 周期内时，_is_data_fresh 返回 True（跳过下载）。"""
         import datetime
 
         from src.freqtrade_bridge.data_downloader import DataDownloader
 
-        # 创建模拟数据文件（pair=BTC/USDT, timeframe=1h）
-        datadir = tmp_path / "data" / "binance"
-        datadir.mkdir(parents=True)
+        # feather 路径：{datadir}/BTC_USDT-1d.feather
+        data_file = tmp_path / "BTC_USDT-1d.feather"
 
-        # 文件名格式：BTC_USDT-1h-futures.json
-        data_file = datadir / "BTC_USDT-1h-futures.json"
-
-        # 构造最后一根 K 线时间戳为 30 分钟前（在当前 1h 周期内）
+        # 12 小时前的数据（在 1d 的 2x 容差内）
         now = datetime.datetime.now(tz=datetime.timezone.utc)
-        last_candle_ts = int((now - datetime.timedelta(minutes=30)).timestamp() * 1000)
-
-        # freqtrade OHLCV 格式：[timestamp, open, high, low, close, volume]
-        data = [[last_candle_ts, 50000.0, 51000.0, 49000.0, 50500.0, 100.0]]
-        data_file.write_text(json.dumps(data))
+        ts = (now - datetime.timedelta(hours=12)).isoformat()
+        _write_feather(data_file, ts)
 
         downloader = DataDownloader()
-        result = downloader._is_data_fresh(tmp_path, "BTC/USDT", "1h")
+        result = downloader._is_data_fresh(tmp_path, "BTC/USDT", "1d")
         assert result is True
 
     def test_data_is_stale_exceeds_period(self, tmp_path: Path) -> None:
-        """数据超过 1h 周期时，_is_data_fresh 返回 False（触发下载）。"""
+        """数据超过 2x 周期时，_is_data_fresh 返回 False（触发下载）。"""
         import datetime
 
         from src.freqtrade_bridge.data_downloader import DataDownloader
 
-        datadir = tmp_path / "data" / "binance"
-        datadir.mkdir(parents=True)
-        data_file = datadir / "BTC_USDT-1h-futures.json"
+        data_file = tmp_path / "BTC_USDT-1d.feather"
 
-        # 最后一根 K 线为 2 小时前（超过 1h 周期）
+        # 3 天前（超过 1d 的 2x 容差）
         now = datetime.datetime.now(tz=datetime.timezone.utc)
-        last_candle_ts = int((now - datetime.timedelta(hours=2)).timestamp() * 1000)
-
-        data = [[last_candle_ts, 50000.0, 51000.0, 49000.0, 50500.0, 100.0]]
-        data_file.write_text(json.dumps(data))
+        ts = (now - datetime.timedelta(days=3)).isoformat()
+        _write_feather(data_file, ts)
 
         downloader = DataDownloader()
-        result = downloader._is_data_fresh(tmp_path, "BTC/USDT", "1h")
+        result = downloader._is_data_fresh(tmp_path, "BTC/USDT", "1d")
         assert result is False
 
     def test_file_not_exist_returns_false(self, tmp_path: Path) -> None:
@@ -67,34 +73,30 @@ class TestDataFreshness:
         from src.freqtrade_bridge.data_downloader import DataDownloader
 
         downloader = DataDownloader()
-        # 不创建任何数据文件
-        result = downloader._is_data_fresh(tmp_path, "BTC/USDT", "1h")
+        result = downloader._is_data_fresh(tmp_path, "BTC/USDT", "1d")
         assert result is False
 
     def test_corrupted_file_returns_false(self, tmp_path: Path) -> None:
         """文件内容损坏时，_is_data_fresh 返回 False（触发下载）。"""
         from src.freqtrade_bridge.data_downloader import DataDownloader
 
-        datadir = tmp_path / "data" / "binance"
-        datadir.mkdir(parents=True)
-        data_file = datadir / "BTC_USDT-1h-futures.json"
-        data_file.write_text("not_valid_json{{{")
+        data_file = tmp_path / "BTC_USDT-1d.feather"
+        data_file.write_text("not_valid_feather{{{")
 
         downloader = DataDownloader()
-        result = downloader._is_data_fresh(tmp_path, "BTC/USDT", "1h")
+        result = downloader._is_data_fresh(tmp_path, "BTC/USDT", "1d")
         assert result is False
 
     def test_empty_file_returns_false(self, tmp_path: Path) -> None:
-        """空文件时，_is_data_fresh 返回 False。"""
+        """空 DataFrame 时，_is_data_fresh 返回 False。"""
         from src.freqtrade_bridge.data_downloader import DataDownloader
 
-        datadir = tmp_path / "data" / "binance"
-        datadir.mkdir(parents=True)
-        data_file = datadir / "BTC_USDT-1h-futures.json"
-        data_file.write_text("[]")  # 空列表
+        data_file = tmp_path / "BTC_USDT-1d.feather"
+        data_file.parent.mkdir(parents=True, exist_ok=True)
+        pd.DataFrame().to_feather(data_file)
 
         downloader = DataDownloader()
-        result = downloader._is_data_fresh(tmp_path, "BTC/USDT", "1h")
+        result = downloader._is_data_fresh(tmp_path, "BTC/USDT", "1d")
         assert result is False
 
 
@@ -112,7 +114,7 @@ class TestRunDownloadSubprocess:
             with pytest.raises(FreqtradeTimeoutError):
                 downloader._run_download_subprocess(
                     pairs=["BTC/USDT"],
-                    timeframes=["1h"],
+                    timeframes=["1d"],
                     datadir=tmp_path,
                     days=30,
                     timeout=300,
@@ -133,7 +135,7 @@ class TestRunDownloadSubprocess:
             with pytest.raises(FreqtradeExecutionError):
                 downloader._run_download_subprocess(
                     pairs=["BTC/USDT"],
-                    timeframes=["1h"],
+                    timeframes=["1d"],
                     datadir=tmp_path,
                     days=30,
                 )
@@ -151,7 +153,7 @@ class TestRunDownloadSubprocess:
         with patch("subprocess.run", return_value=mock_result):
             downloader._run_download_subprocess(
                 pairs=["BTC/USDT"],
-                timeframes=["1h"],
+                timeframes=["1d"],
                 datadir=tmp_path,
                 days=30,
             )  # 不抛异常即通过
@@ -166,9 +168,7 @@ class TestRunDownloadSubprocess:
         captured_config: dict = {}
 
         def capture_subprocess(*args, **kwargs):
-            """捕获子进程调用，检查传入的配置文件内容。"""
             cmd = args[0] if args else kwargs.get("args", [])
-            # 找到 --config 参数后的配置文件路径
             for i, arg in enumerate(cmd):
                 if arg == "--config" and i + 1 < len(cmd):
                     config_path = Path(cmd[i + 1])
@@ -182,7 +182,7 @@ class TestRunDownloadSubprocess:
         with patch("subprocess.run", side_effect=capture_subprocess):
             downloader._run_download_subprocess(
                 pairs=["BTC/USDT"],
-                timeframes=["1h"],
+                timeframes=["1d"],
                 datadir=tmp_path,
                 days=30,
             )
@@ -212,7 +212,7 @@ class TestRunDownloadSubprocess:
         with patch("subprocess.run", side_effect=capture_subprocess):
             downloader._run_download_subprocess(
                 pairs=["BTC/USDT"],
-                timeframes=["1h"],
+                timeframes=["1d"],
                 datadir=tmp_path,
                 days=30,
             )
@@ -244,14 +244,39 @@ class TestRunDownloadSubprocess:
         with patch("subprocess.run", side_effect=capture_subprocess):
             downloader._run_download_subprocess(
                 pairs=["BTC/USDT"],
-                timeframes=["1h"],
+                timeframes=["1d"],
                 datadir=tmp_path,
                 days=30,
             )
 
-        # telegram 应被禁用（不存在或 enabled=false）
         telegram = captured_config.get("telegram", {})
         assert telegram.get("enabled", True) is False, "telegram 通知应被禁用"
+
+    def test_uses_spot_trading_mode(self, tmp_path: Path) -> None:
+        """子进程命令应使用 --trading-mode spot（而非 futures）。"""
+        from src.freqtrade_bridge.data_downloader import DataDownloader
+
+        downloader = DataDownloader()
+
+        captured_cmd: list[str] = []
+
+        def capture_subprocess(*args, **kwargs):
+            cmd = args[0] if args else kwargs.get("args", [])
+            captured_cmd.extend(cmd)
+            result = MagicMock()
+            result.returncode = 0
+            return result
+
+        with patch("subprocess.run", side_effect=capture_subprocess):
+            downloader._run_download_subprocess(
+                pairs=["BTC/USDT"],
+                timeframes=["1d"],
+                datadir=tmp_path,
+                days=30,
+            )
+
+        idx = captured_cmd.index("--trading-mode")
+        assert captured_cmd[idx + 1] == "spot"
 
 
 class TestDownloadMarketData:
@@ -260,35 +285,29 @@ class TestDownloadMarketData:
     def test_local_fallback_when_download_fails_but_file_exists(self, tmp_path: Path) -> None:
         """download-data 失败但本地文件存在时，降级使用本地数据（需求 1.9）。"""
         import datetime
-        import json as _json
 
         from src.freqtrade_bridge.data_downloader import DataDownloader, DownloadResult
         from src.freqtrade_bridge.exceptions import FreqtradeExecutionError
 
-        # 创建本地数据文件（新鲜度已过期，触发下载）
-        datadir = tmp_path / "data" / "binance"
-        datadir.mkdir(parents=True)
-        data_file = datadir / "BTC_USDT-1h-futures.json"
-
-        # 2 小时前的数据（过期，会触发下载尝试）
+        # 创建过期的本地 feather（3 天前 → 触发下载尝试）
+        data_file = tmp_path / "BTC_USDT-1d.feather"
         now = datetime.datetime.now(tz=datetime.timezone.utc)
-        stale_ts = int((now - datetime.timedelta(hours=2)).timestamp() * 1000)
-        data_file.write_text(_json.dumps([[stale_ts, 50000.0, 51000.0, 49000.0, 50500.0, 100.0]]))
+        ts = (now - datetime.timedelta(days=3)).isoformat()
+        _write_feather(data_file, ts)
 
         downloader = DataDownloader()
 
-        # Mock _run_download_subprocess 使其失败
         with patch.object(downloader, "_run_download_subprocess", side_effect=FreqtradeExecutionError("下载失败")):
             result = downloader.download_market_data(
                 pairs=["BTC/USDT"],
-                timeframes=["1h"],
+                timeframes=["1d"],
                 datadir=tmp_path,
                 days=30,
             )
 
         assert isinstance(result, DownloadResult)
         assert result.data_source == "local_fallback"
-        assert result.pairs_failed == 0  # 降级成功，不算失败
+        assert result.pairs_failed == 0
 
     def test_raises_when_download_fails_and_no_local_file(self, tmp_path: Path) -> None:
         """download-data 失败且无本地文件时，抛出异常（需求 1.9）。"""
@@ -297,12 +316,11 @@ class TestDownloadMarketData:
 
         downloader = DataDownloader()
 
-        # 不创建本地数据文件
         with patch.object(downloader, "_run_download_subprocess", side_effect=FreqtradeExecutionError("下载失败")):
             with pytest.raises(FreqtradeExecutionError):
                 downloader.download_market_data(
                     pairs=["BTC/USDT"],
-                    timeframes=["1h"],
+                    timeframes=["1d"],
                     datadir=tmp_path,
                     days=30,
                 )
@@ -313,22 +331,19 @@ class TestDownloadMarketData:
 
         from src.freqtrade_bridge.data_downloader import DataDownloader, DownloadResult
 
-        datadir = tmp_path / "data" / "binance"
-        datadir.mkdir(parents=True)
-        data_file = datadir / "BTC_USDT-1h-futures.json"
+        data_file = tmp_path / "BTC_USDT-1d.feather"
 
-        # 30 分钟前（新鲜）
+        # 12 小时前（新鲜，在 1d × 2 容差内）
         now = datetime.datetime.now(tz=datetime.timezone.utc)
-        fresh_ts = int((now - datetime.timedelta(minutes=30)).timestamp() * 1000)
-        data_file.write_text(json.dumps([[fresh_ts, 50000.0, 51000.0, 49000.0, 50500.0, 100.0]]))
+        ts = (now - datetime.timedelta(hours=12)).isoformat()
+        _write_feather(data_file, ts)
 
         downloader = DataDownloader()
 
-        # _run_download_subprocess 不应被调用
         with patch.object(downloader, "_run_download_subprocess") as mock_dl:
             result = downloader.download_market_data(
                 pairs=["BTC/USDT"],
-                timeframes=["1h"],
+                timeframes=["1d"],
                 datadir=tmp_path,
                 days=30,
             )
@@ -344,11 +359,10 @@ class TestDownloadMarketData:
 
         downloader = DataDownloader()
 
-        # Mock 成功的下载
         with patch.object(downloader, "_run_download_subprocess", return_value=None):
             result = downloader.download_market_data(
                 pairs=["BTC/USDT"],
-                timeframes=["1h"],
+                timeframes=["1d"],
                 datadir=tmp_path,
                 days=30,
             )
@@ -380,12 +394,11 @@ class TestDownloadMarketData:
         with patch("subprocess.run", side_effect=capture_and_succeed):
             downloader.download_market_data(
                 pairs=["BTC/USDT"],
-                timeframes=["1h"],
+                timeframes=["1d"],
                 datadir=tmp_path,
                 days=30,
             )
 
-        # 临时配置目录应已被清理
         for temp_dir in created_temp_dirs:
             assert not os.path.exists(temp_dir), f"临时目录未被清理: {temp_dir}"
 
@@ -398,7 +411,7 @@ class TestDownloadMarketData:
         with patch.object(downloader, "_run_download_subprocess", return_value=None):
             result = downloader.download_market_data(
                 pairs=["BTC/USDT"],
-                timeframes=["1h"],
+                timeframes=["1d"],
                 datadir=tmp_path,
                 days=30,
             )

@@ -79,7 +79,7 @@ def _parse_crontab(cron_expr: str) -> crontab:
 
 celery_app.conf.beat_schedule = {
     "run-daily-backtest": {
-        "task": "src.workers.tasks.backtest_tasks.run_backtest_task",
+        "task": "src.workers.tasks.backtest_tasks.run_all_backtests_task",
         "schedule": crontab(hour=2, minute=0),  # 每日 UTC 02:00
         "options": {"queue": "backtest"},
     },

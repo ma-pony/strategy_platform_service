@@ -200,25 +200,27 @@ class DataDownloader:
             return False
 
         try:
-            raw_data = json.loads(data_file.read_text())
-            if not raw_data:
+            import pandas as pd
+
+            df = pd.read_feather(data_file)
+            if df.empty:
                 return False
 
-            # freqtrade OHLCV 格式：[timestamp_ms, open, high, low, close, volume]
-            last_candle = raw_data[-1]
-            last_ts_ms = int(last_candle[0])
-            last_ts = datetime.datetime.fromtimestamp(last_ts_ms / 1000, tz=datetime.timezone.utc)
+            # freqtrade feather 格式含 date 列（datetime64[ns, UTC]）
+            last_date = pd.Timestamp(df["date"].iloc[-1])
+            if last_date.tzinfo is None:
+                last_date = last_date.tz_localize("UTC")
 
             # 计算时间周期对应的秒数
             period_seconds = self._timeframe_to_seconds(timeframe)
 
-            # 检查最后一根 K 线是否在当前周期内
+            # 检查最后一根 K 线是否在当前周期内（2 倍容差）
             now = datetime.datetime.now(tz=datetime.timezone.utc)
-            age_seconds = (now - last_ts).total_seconds()
+            age_seconds = (now - last_date).total_seconds()
 
-            return age_seconds <= period_seconds
+            return age_seconds <= period_seconds * 2
 
-        except (json.JSONDecodeError, IndexError, ValueError, KeyError, TypeError):
+        except Exception:
             return False
 
     def _run_download_subprocess(
@@ -276,7 +278,7 @@ class DataDownloader:
                 "--datadir",
                 str(datadir),
                 "--trading-mode",
-                "futures",
+                "spot",
             ]
 
             logger.info(
@@ -353,13 +355,13 @@ class DataDownloader:
     def _get_data_file_path(self, datadir: Path, pair: str, timeframe: str) -> Path:
         """获取 (pair, timeframe) 对应的 OHLCV 数据文件路径。
 
-        freqtrade 默认文件命名格式：
-          {datadir}/data/{exchange}/{pair_normalized}-{timeframe}-futures.json
-          例如：BTC/USDT → BTC_USDT-1h-futures.json
+        freqtrade 默认文件命名格式（spot feather）：
+          {datadir}/{pair_normalized}-{timeframe}.feather
+          例如：BTC/USDT → BTC_USDT-1d.feather
         """
         pair_normalized = pair.replace("/", "_")
-        filename = f"{pair_normalized}-{timeframe}-futures.json"
-        return datadir / "data" / _EXCHANGE_NAME / filename
+        filename = f"{pair_normalized}-{timeframe}.feather"
+        return datadir / filename
 
     @staticmethod
     def _timeframe_to_seconds(timeframe: str) -> float:

@@ -433,3 +433,25 @@ def _parse_datetime(value: str | None) -> datetime.datetime:
         return dt
     except (ValueError, TypeError):
         return datetime.datetime.now(tz=datetime.timezone.utc)
+
+
+@shared_task(
+    name="src.workers.tasks.backtest_tasks.run_all_backtests_task",
+    bind=False,
+    acks_late=True,
+    queue="backtest",
+)
+def run_all_backtests_task() -> None:
+    """每日回测协调任务：遍历所有 is_active 策略并逐一调度 run_backtest_task。
+
+    Celery Beat 触发入口，替代直接调用需要 strategy_id 参数的 run_backtest_task。
+    """
+    from src.models.strategy import Strategy
+
+    with SyncSessionLocal() as session:
+        strategies = session.execute(select(Strategy.id).where(Strategy.is_active.is_(True))).scalars().all()
+
+    logger.info("daily backtest coordinator dispatching", strategy_count=len(strategies))
+
+    for strategy_id in strategies:
+        run_backtest_task.delay(strategy_id)

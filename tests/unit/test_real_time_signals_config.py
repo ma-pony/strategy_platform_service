@@ -73,12 +73,12 @@ class TestSignalConfigExtension:
         assert "ETH/USDT" in settings.signal_pairs
 
     def test_signal_timeframes_default(self, env_setup: None) -> None:
-        """SIGNAL_TIMEFRAMES 默认值为 ['1h']（与需求 2.8 一致）。"""
+        """SIGNAL_TIMEFRAMES 默认值为 ['1d']（所有策略均为 1d 周期）。"""
         from src.core.app_settings import AppSettings
 
         settings = AppSettings()
         assert isinstance(settings.signal_timeframes, list)
-        assert settings.signal_timeframes == ["1h"]
+        assert settings.signal_timeframes == ["1d"]
 
     def test_settings_backward_compatible(self, env_setup: None) -> None:
         """新增配置项不影响原有配置项（向后兼容）。"""

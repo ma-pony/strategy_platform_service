@@ -70,7 +70,7 @@ class AppSettings(BaseSettings):
 
     # 实时信号覆盖范围配置（需求 2.8）
     signal_pairs: list[str] = _DEFAULT_SIGNAL_PAIRS  # type: ignore[assignment]
-    signal_timeframes: list[str] = ["1h"]  # type: ignore[assignment]  # 默认仅 1h 周期
+    signal_timeframes: list[str] = ["1d"]  # type: ignore[assignment]  # 所有策略均为 1d 周期
 
     @field_validator("signal_pairs", "signal_timeframes", mode="before")
     @classmethod
