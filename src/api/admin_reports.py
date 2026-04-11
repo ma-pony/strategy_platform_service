@@ -5,7 +5,7 @@
   - PUT /admin/reports/{id}：更新研报
   - DELETE /admin/reports/{id}：删除研报
 
-所有端点通过 Depends(require_admin) 强制管理员鉴权。
+所有端点通过 Depends(require_admin_or_api_key) 强制管理员鉴权。
 """
 
 import datetime
@@ -17,7 +17,7 @@ from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from src.core.deps import get_db, require_admin
+from src.core.deps import get_db, require_admin_or_api_key
 from src.core.exceptions import NotFoundError
 from src.core.response import ApiResponse, ok
 from src.models.report import ReportCoin, ResearchReport
@@ -70,7 +70,7 @@ class ReportResponse(BaseModel):
 async def create_report(
     body: ReportCreateRequest,
     db: AsyncSession = Depends(get_db),
-    admin: Any = Depends(require_admin),
+    admin: Any = Depends(require_admin_or_api_key),
 ) -> ApiResponse[ReportResponse]:
     """创建研报。"""
     report = ResearchReport(
@@ -96,7 +96,7 @@ async def update_report(
     report_id: int,
     body: ReportUpdateRequest,
     db: AsyncSession = Depends(get_db),
-    admin: Any = Depends(require_admin),
+    admin: Any = Depends(require_admin_or_api_key),
 ) -> ApiResponse[ReportResponse]:
     """更新研报。"""
     from sqlalchemy import select
@@ -130,7 +130,7 @@ async def update_report(
 async def delete_report(
     report_id: int,
     db: AsyncSession = Depends(get_db),
-    admin: Any = Depends(require_admin),
+    admin: Any = Depends(require_admin_or_api_key),
 ) -> ApiResponse[Any]:
     """删除研报。"""
     from sqlalchemy import select

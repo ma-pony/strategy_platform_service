@@ -168,6 +168,52 @@ async def require_admin(
     return current_user
 
 
+async def require_admin_or_api_key(
+    request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer_scheme),
+    db: AsyncSession = Depends(get_db),
+) -> Any:
+    """管理员 JWT 或 X-API-Key 双模式鉴权。
+
+    优先检查 X-API-Key header（服务间调用）；
+    若无则走标准 Bearer JWT → require_admin 链路。
+
+    Raises:
+        AuthenticationError: 鉴权失败
+        PermissionError: 非管理员用户（JWT 模式）
+    """
+    api_key = request.headers.get("X-API-Key", "")
+    settings = get_settings()
+
+    if api_key and settings.internal_api_key and api_key == settings.internal_api_key:
+        return None  # API Key 鉴权通过，无需返回用户对象
+
+    # 回退到 JWT 鉴权
+    if credentials is None:
+        raise AuthenticationError("缺少 Authorization header 或 X-API-Key")
+
+    payload = _security.decode_token(credentials.credentials)
+    user_id_str: str = payload.get("sub", "")
+
+    from src.models.user import User
+
+    try:
+        user_id = int(user_id_str)
+    except (ValueError, TypeError):
+        raise AuthenticationError("token sub 字段无效") from None
+
+    user = await db.get(User, user_id)
+
+    if user is None:
+        raise AuthenticationError("用户不存在")
+    if not user.is_active:
+        raise AuthenticationError("用户账户已被禁用")
+    if not getattr(user, "is_admin", False):
+        raise PermissionError("需要管理员权限")
+
+    return user
+
+
 def require_membership(min_tier: MembershipTier) -> Callable[..., Any]:
     """会员等级校验工厂函数。
 

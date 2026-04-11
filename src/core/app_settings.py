@@ -48,6 +48,9 @@ class AppSettings(BaseSettings):
     # 必填：Redis 配置
     redis_url: str
 
+    # 服务间调用 API Key（用于外部服务写入研报等管理接口）
+    internal_api_key: str = ""
+
     # 可选：应用配置
     app_env: str = "development"
     debug: bool = False
