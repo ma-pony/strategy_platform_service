@@ -88,15 +88,33 @@ def _get_active_strategies_and_pairs() -> tuple[list[dict[str, Any]], list[str]]
 
 
 def _load_strategy_class(strategy_name: str) -> Any:
-    """尝试动态加载 freqtrade 策略类。
+    """通过策略注册表动态加载 freqtrade 策略类。
+
+    使用 strategy_registry.lookup() 获取策略文件路径和类名，
+    再通过 importlib 从文件路径动态导入策略类。
 
     加载失败时返回 None（调用方负责处理 None 策略类）。
     """
-    try:
-        from freqtrade.resolvers import StrategyResolver  # type: ignore[import]
+    import importlib.util
+    import sys
 
-        return StrategyResolver.load_strategy_class(strategy_name)
-    except Exception:
+    try:
+        from src.freqtrade_bridge.strategy_registry import lookup
+
+        entry = lookup(strategy_name)
+        file_path = entry["file_path"]
+        class_name = entry["class_name"]
+
+        spec = importlib.util.spec_from_file_location(class_name, str(file_path))
+        if spec is None or spec.loader is None:
+            logger.warning("无法加载策略文件", strategy=strategy_name, file_path=str(file_path))
+            return None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[class_name] = module
+        spec.loader.exec_module(module)  # type: ignore[union-attr]
+        return getattr(module, class_name)
+    except Exception as exc:
+        logger.warning("策略类加载失败", strategy=strategy_name, error=str(exc))
         return None
 
 
