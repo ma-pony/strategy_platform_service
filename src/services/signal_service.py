@@ -211,8 +211,10 @@ class SignalService:
         timeframe: str | None,
         page: int,
         page_size: int,
-    ) -> tuple[list[TradingSignal], int, datetime]:
-        """从 PostgreSQL 查询信号列表（含过滤和分页）。"""
+    ) -> tuple[list[Any], int, datetime]:
+        """从 PostgreSQL 查询信号列表（含过滤和分页），JOIN strategies 获取 strategy_name。"""
+        from types import SimpleNamespace
+
         from sqlalchemy import func
 
         conditions = []
@@ -230,20 +232,39 @@ class SignalService:
         count_result = await db.execute(count_stmt)
         total: int = count_result.scalar() or 0
 
-        # 分页查询
+        # 分页查询（JOIN strategies 获取 strategy_name）
         offset = (page - 1) * page_size
-        stmt = select(TradingSignal).order_by(TradingSignal.signal_at.desc()).limit(page_size).offset(offset)
+        stmt = (
+            select(TradingSignal, Strategy.name.label("strategy_name"))
+            .join(Strategy, TradingSignal.strategy_id == Strategy.id)
+            .order_by(TradingSignal.signal_at.desc())
+            .limit(page_size)
+            .offset(offset)
+        )
         if conditions:
             stmt = stmt.where(*conditions)
 
         result = await db.execute(stmt)
-        signals: list[TradingSignal] = list(result.scalars().all())
+        rows = result.all()
 
-        if signals:
-            last_updated_at = signals[0].signal_at
-        else:
-            last_updated_at = datetime.now(timezone.utc)
+        signals = []
+        for row in rows:
+            sig = row[0]
+            strategy_name = row[1]
+            obj = SimpleNamespace(
+                id=sig.id,
+                strategy_id=sig.strategy_id,
+                strategy_name=strategy_name,
+                pair=sig.pair,
+                timeframe=sig.timeframe,
+                direction=sig.direction,
+                confidence_score=sig.confidence_score,
+                signal_at=sig.signal_at,
+                created_at=sig.created_at,
+            )
+            signals.append(obj)
 
+        last_updated_at = signals[0].signal_at if signals else datetime.now(timezone.utc)
         return signals, total, last_updated_at
 
 

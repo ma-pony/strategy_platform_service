@@ -104,3 +104,83 @@ async def get_signals(
             "last_updated_at": last_updated_at.isoformat(),
         }
     )
+
+
+def _is_vip(membership: Any) -> bool:
+    from src.core.enums import MembershipTier
+
+    if membership is None:
+        return False
+    if isinstance(membership, MembershipTier):
+        return membership in (MembershipTier.VIP1, MembershipTier.VIP2)
+    return str(membership).upper() in ("VIP1", "VIP2")
+
+
+@router.get("/signals", response_model=ApiResponse[Any])
+async def list_all_signals(
+    request: Request,
+    pair: str | None = Query(default=None),
+    timeframe: str | None = Query(default=None),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=200, ge=1, le=200),
+    db: AsyncSession = Depends(get_db),
+    current_user: Any = Depends(get_optional_user),
+) -> ApiResponse[Any]:
+    """全局信号列表，跨所有策略聚合，支持 pair/timeframe 过滤和分页。"""
+    if current_user is None:
+        visitor_id = request.headers.get("X-Visitor-ID", "").strip()
+        if not visitor_id:
+            from src.core.exceptions import TrialExpiredError
+
+            raise TrialExpiredError
+        from src.services.trial_service import is_trial_active
+        from src.workers.redis_client import get_redis_client
+
+        if not is_trial_active(get_redis_client(), visitor_id):
+            from src.core.exceptions import TrialExpiredError
+
+            raise TrialExpiredError
+    elif current_user.membership in (None, "free", "FREE"):
+        from src.core.enums import MembershipTier
+
+        membership_val = current_user.membership
+        is_free = (
+            membership_val == MembershipTier.FREE
+            if isinstance(membership_val, MembershipTier)
+            else str(membership_val).upper() == "FREE"
+        )
+        if is_free:
+            visitor_id = request.headers.get("X-Visitor-ID", "").strip()
+            has_trial = False
+            if visitor_id:
+                from src.services.trial_service import is_trial_active
+                from src.workers.redis_client import get_redis_client
+
+                has_trial = is_trial_active(get_redis_client(), visitor_id)
+            if not has_trial:
+                from src.core.exceptions import MembershipRequiredError
+
+                raise MembershipRequiredError
+
+    signals, total, _ = await _signal_service.list_signals(
+        db, pair=pair, timeframe=timeframe, page=page, page_size=page_size
+    )
+
+    membership = current_user.membership if current_user is not None else None
+    show_confidence = _is_vip(membership)
+    items = [
+        {
+            "id": signal.id,
+            "strategy_id": signal.strategy_id,
+            "strategy_name": getattr(signal, "strategy_name", None),
+            "pair": signal.pair,
+            "timeframe": signal.timeframe,
+            "direction": signal.direction.value if hasattr(signal.direction, "value") else signal.direction,
+            "signal_at": signal.signal_at.isoformat(),
+            "created_at": signal.created_at.isoformat(),
+            "confidence_score": signal.confidence_score if show_confidence else None,
+        }
+        for signal in signals
+    ]
+
+    return ok(data={"items": items, "total": total, "page": page, "page_size": page_size})
