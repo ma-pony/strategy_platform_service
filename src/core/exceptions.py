@@ -103,6 +103,27 @@ class EmailConflictError(AppError):
     default_message = "邮箱已被注册"
 
 
+class TrialExpiredError(AppError):
+    """体验期已过期（code=4031）。"""
+
+    code = 4031
+    default_message = "trial_expired"
+
+
+class LoginRequiredError(AppError):
+    """需要登录（code=4032）。"""
+
+    code = 4032
+    default_message = "login_required"
+
+
+class MembershipRequiredError(AppError):
+    """需要付费会员（code=4033）。"""
+
+    code = 4033
+    default_message = "membership_required"
+
+
 class UnsupportedStrategyError(AppError):
     """策略不受支持（code=3003）。"""
 

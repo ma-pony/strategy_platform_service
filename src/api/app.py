@@ -115,6 +115,7 @@ def _register_routers(app: FastAPI) -> None:
     from src.api.reports import router as reports_router
     from src.api.signals import router as signals_router
     from src.api.strategies import router as strategies_router
+    from src.api.trial import router as trial_router
 
     api_v1_prefix = "/api/v1"
 
@@ -127,3 +128,4 @@ def _register_routers(app: FastAPI) -> None:
     app.include_router(admin_backtests_router, prefix=api_v1_prefix)
     app.include_router(admin_reports_router, prefix=api_v1_prefix)
     app.include_router(pair_metrics_router, prefix=api_v1_prefix)
+    app.include_router(trial_router, prefix=api_v1_prefix)
