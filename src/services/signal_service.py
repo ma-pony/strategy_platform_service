@@ -13,9 +13,10 @@ Redis 键设计：
   TTL: 3600s（由信号 Worker 写入时设定）
 """
 
+import asyncio
 import json
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, cast
 
 import structlog
 from sqlalchemy import select
@@ -71,11 +72,11 @@ class SignalService:
         if strategy is None:
             raise NotFoundError(f"策略 {strategy_id} 不存在")
 
-        # Step 2: 尝试从 Redis 读取
+        # Step 2: 尝试从 Redis 读取（同步客户端在线程池中执行，避免阻塞事件循环）
         cache_key = f"signal:{strategy_id}"
         try:
             redis_client = get_redis_client()
-            cached = redis_client.get(cache_key)
+            cached = cast("str | None", await asyncio.to_thread(redis_client.get, cache_key))
             if cached is not None:
                 data: dict[str, Any] = json.loads(cached)
                 signals_raw = data.get("signals", [])
@@ -165,7 +166,7 @@ class SignalService:
             cache_key = f"signal:{strategy_id}"
             try:
                 redis_client = get_redis_client()
-                cached = redis_client.get(cache_key)
+                cached = cast("str | None", await asyncio.to_thread(redis_client.get, cache_key))
                 if cached is not None:
                     data: dict[str, Any] = json.loads(cached)
                     signals_raw = data.get("signals", [])

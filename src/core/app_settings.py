@@ -51,6 +51,10 @@ class AppSettings(BaseSettings):
     # 服务间调用 API Key（用于外部服务写入研报等管理接口）
     internal_api_key: str = ""
 
+    # 可信反向代理 CIDR 白名单 — 仅当 request.client.host 落在其中时才信任 X-Forwarded-For
+    # 默认包含 Docker/K8s 私网段及环回；生产部署路径 OpenResty (10.255.0.1) → 本服务 都在 10.0.0.0/8
+    trusted_proxy_cidrs: list[str] = ["127.0.0.0/8", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"]
+
     # 可选：应用配置
     app_env: str = "development"
     debug: bool = False
@@ -74,6 +78,20 @@ class AppSettings(BaseSettings):
     # 实时信号覆盖范围配置（需求 2.8）
     signal_pairs: list[str] = _DEFAULT_SIGNAL_PAIRS  # type: ignore[assignment]
     signal_timeframes: list[str] = ["1d"]  # type: ignore[assignment]  # 所有策略均为 1d 周期
+
+    @field_validator("trusted_proxy_cidrs", mode="before")
+    @classmethod
+    def parse_cidr_list(cls, v: object) -> object:
+        """支持环境变量以 JSON 列表或逗号分隔字符串传入 CIDR 列表。"""
+        if isinstance(v, str):
+            try:
+                parsed = json.loads(v)
+                if isinstance(parsed, list):
+                    return parsed
+            except (json.JSONDecodeError, ValueError):
+                pass
+            return [s.strip() for s in v.split(",") if s.strip()]
+        return v
 
     @field_validator("signal_pairs", "signal_timeframes", mode="before")
     @classmethod

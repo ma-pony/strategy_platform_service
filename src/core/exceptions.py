@@ -7,6 +7,7 @@
   1000–1999  认证/授权错误
   2000–2999  请求参数错误
   3000–3999  业务逻辑错误
+  4000–4999  Paywall / 体验期错误（FingerprintJS visitor_id）
   5000–5999  服务端内部错误
 """
 
@@ -103,6 +104,18 @@ class EmailConflictError(AppError):
     default_message = "邮箱已被注册"
 
 
+class UnsupportedStrategyError(AppError):
+    """策略不受支持（code=3003）。"""
+
+    code = 3003
+    default_message = "策略不受支持，请联系管理员"
+
+
+# ──────────────────────────────────────────────
+# 4000–4999  Paywall / 体验期错误
+# ──────────────────────────────────────────────
+
+
 class TrialExpiredError(AppError):
     """体验期已过期（code=4031）。"""
 
@@ -122,13 +135,6 @@ class MembershipRequiredError(AppError):
 
     code = 4033
     default_message = "membership_required"
-
-
-class UnsupportedStrategyError(AppError):
-    """策略不受支持（code=3003）。"""
-
-    code = 3003
-    default_message = "策略不受支持，请联系管理员"
 
 
 # ──────────────────────────────────────────────

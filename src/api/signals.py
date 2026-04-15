@@ -11,6 +11,7 @@
 使用 get_optional_user 注入可选用户（无 token 时返回 None 即匿名）。
 """
 
+import asyncio
 from typing import Any
 
 from fastapi import APIRouter, Depends, Query, Request
@@ -26,22 +27,23 @@ router = APIRouter(tags=["signals"])
 _signal_service = SignalService()
 
 
-def _check_paywall(request: Request, current_user: Any) -> None:
+async def _check_paywall(request: Request, current_user: Any) -> None:
     """统一 paywall 鉴权检查。
 
     - 未登录用户：需有效 X-Visitor-ID + 有效 trial，否则 4032/4031
     - Free 用户：需有效 trial，否则 4033
     - VIP/admin：直接通过
     Redis 不可用时静默降级为拒绝访问。
+    同步 Redis 调用放入线程池避免阻塞事件循环。
     """
     from src.core.enums import MembershipTier
     from src.core.exceptions import LoginRequiredError, MembershipRequiredError, TrialExpiredError
     from src.services.trial_service import is_trial_active
     from src.workers.redis_client import get_redis_client
 
-    def _has_active_trial(visitor_id: str) -> bool:
+    async def _has_active_trial(visitor_id: str) -> bool:
         try:
-            return is_trial_active(get_redis_client(), visitor_id)
+            return await asyncio.to_thread(is_trial_active, get_redis_client(), visitor_id)
         except Exception:
             return False
 
@@ -49,7 +51,7 @@ def _check_paywall(request: Request, current_user: Any) -> None:
         visitor_id = request.headers.get("X-Visitor-ID", "").strip()
         if not visitor_id:
             raise LoginRequiredError
-        if not _has_active_trial(visitor_id):
+        if not await _has_active_trial(visitor_id):
             raise TrialExpiredError
         return
 
@@ -61,7 +63,7 @@ def _check_paywall(request: Request, current_user: Any) -> None:
 
     if is_free:
         visitor_id = request.headers.get("X-Visitor-ID", "").strip()
-        if not visitor_id or not _has_active_trial(visitor_id):
+        if not visitor_id or not await _has_active_trial(visitor_id):
             raise MembershipRequiredError
 
 
@@ -84,7 +86,7 @@ async def get_signals(
     current_user: Any = Depends(get_optional_user),
 ) -> ApiResponse[Any]:
     """获取指定策略的交易信号列表。"""
-    _check_paywall(request, current_user)
+    await _check_paywall(request, current_user)
 
     signals, last_updated_at = await _signal_service.get_signals(db, strategy_id=strategy_id, limit=limit)
 
@@ -105,7 +107,7 @@ async def list_all_signals(
     current_user: Any = Depends(get_optional_user),
 ) -> ApiResponse[Any]:
     """全局信号列表，跨所有策略聚合，支持 pair/timeframe 过滤和分页。"""
-    _check_paywall(request, current_user)
+    await _check_paywall(request, current_user)
 
     signals, total, _ = await _signal_service.list_signals(
         db, pair=pair, timeframe=timeframe, page=page, page_size=page_size
