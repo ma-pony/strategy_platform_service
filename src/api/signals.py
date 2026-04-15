@@ -96,6 +96,37 @@ async def get_signals(
     return ok(data={"signals": signal_items, "last_updated_at": last_updated_at.isoformat()})
 
 
+@router.get("/signals/latest-per-pair", response_model=ApiResponse[Any])
+async def get_latest_per_pair(
+    request: Request,
+    timeframe: str | None = Query(default=None),
+    db: AsyncSession = Depends(get_db),
+    current_user: Any = Depends(get_optional_user),
+) -> ApiResponse[Any]:
+    """每个 pair × strategy 取最新一条信号，前端首页聚合用。"""
+    await _check_paywall(request, current_user)
+
+    signals = await _signal_service.get_latest_per_pair(db, timeframe=timeframe)
+
+    membership = current_user.membership if current_user is not None else None
+    show_confidence = _is_vip(membership)
+    items = [
+        {
+            "id": s.id,
+            "strategy_id": s.strategy_id,
+            "strategy_name": s.strategy_name,
+            "pair": s.pair,
+            "timeframe": s.timeframe,
+            "direction": s.direction.value if hasattr(s.direction, "value") else s.direction,
+            "signal_at": s.signal_at.isoformat(),
+            "created_at": s.created_at.isoformat(),
+            "confidence_score": s.confidence_score if show_confidence else None,
+        }
+        for s in signals
+    ]
+    return ok(data={"items": items, "total": len(items)})
+
+
 @router.get("/signals", response_model=ApiResponse[Any])
 async def list_all_signals(
     request: Request,

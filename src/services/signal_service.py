@@ -268,6 +268,54 @@ class SignalService:
         last_updated_at = signals[0].signal_at if signals else datetime.now(timezone.utc)
         return signals, total, last_updated_at
 
+    async def get_latest_per_pair(
+        self,
+        db: AsyncSession,
+        timeframe: str | None = None,
+    ) -> list[Any]:
+        """每个 pair × strategy 组合取最新一条信号，用于首页聚合展示。"""
+        from types import SimpleNamespace
+
+        from sqlalchemy import func, over
+
+        # 用窗口函数 ROW_NUMBER() 替代 DISTINCT ON，避免 f-string SQL 拼接
+        row_num = (
+            over(
+                func.row_number(),
+                partition_by=[TradingSignal.pair, TradingSignal.strategy_id],
+                order_by=TradingSignal.signal_at.desc(),
+            )
+        ).label("rn")
+
+        inner = select(
+            TradingSignal,
+            Strategy.name.label("strategy_name"),
+            row_num,
+        ).join(Strategy, TradingSignal.strategy_id == Strategy.id)
+
+        if timeframe is not None:
+            inner = inner.where(TradingSignal.timeframe == timeframe)
+
+        subq = inner.subquery()
+        stmt = select(subq).where(subq.c.rn == 1)
+
+        result = await db.execute(stmt)
+        rows = result.mappings().all()
+        return [
+            SimpleNamespace(
+                id=r["id"],
+                strategy_id=r["strategy_id"],
+                strategy_name=r["strategy_name"],
+                pair=r["pair"],
+                timeframe=r["timeframe"],
+                direction=r["direction"],
+                signal_at=r["signal_at"],
+                created_at=r["created_at"],
+                confidence_score=r["confidence_score"],
+            )
+            for r in rows
+        ]
+
 
 def _dicts_to_signals(
     signals_raw: list[dict[str, Any]],
