@@ -358,8 +358,11 @@ class TestSignalQueryOrder:
 
     @pytest.fixture()
     async def authed_client(self, authed_app) -> AsyncGenerator[AsyncClient, None]:
-        async with AsyncClient(transport=ASGITransport(app=authed_app), base_url="http://test") as ac:
-            yield ac
+        from unittest.mock import AsyncMock, patch
+
+        with patch("src.api.signals._check_paywall", new=AsyncMock(return_value=None)):
+            async with AsyncClient(transport=ASGITransport(app=authed_app), base_url="http://test") as ac:
+                yield ac
 
     def _make_signal_obj(
         self,
@@ -792,10 +795,13 @@ class TestSignalRedisCachePerformance:
             )
         ]
 
-        with patch(
-            "src.services.signal_service.SignalService.get_signals",
-            new_callable=AsyncMock,
-            return_value=(mock_signals, datetime.datetime.now(tz=datetime.timezone.utc)),
+        with (
+            patch(
+                "src.services.signal_service.SignalService.get_signals",
+                new_callable=AsyncMock,
+                return_value=(mock_signals, datetime.datetime.now(tz=datetime.timezone.utc)),
+            ),
+            patch("src.api.signals._check_paywall", new=AsyncMock(return_value=None)),
         ):
             async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
                 start = time.perf_counter()
