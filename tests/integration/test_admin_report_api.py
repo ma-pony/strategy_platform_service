@@ -16,7 +16,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from src.core.deps import get_current_user, get_db
+from src.core.deps import get_db, require_admin_or_api_key
 
 TEST_SECRET = "test-secret-key-for-admin-report-api-256bits-long!!"  # pragma: allowlist secret
 
@@ -42,16 +42,6 @@ def _make_admin_user():
         membership="free",
         is_active=True,
         is_admin=True,
-    )
-
-
-def _make_normal_user():
-    return SimpleNamespace(
-        id=2,
-        email="user@example.com",
-        membership="free",
-        is_active=True,
-        is_admin=False,
     )
 
 
@@ -100,7 +90,7 @@ async def client(app) -> AsyncGenerator[AsyncClient, None]:
 def admin_app(app):
     """配置管理员鉴权的应用。"""
     admin_user = _make_admin_user()
-    app.dependency_overrides[get_current_user] = lambda: admin_user
+    app.dependency_overrides[require_admin_or_api_key] = lambda: admin_user
     yield app
     app.dependency_overrides.clear()
 
@@ -108,8 +98,9 @@ def admin_app(app):
 @pytest.fixture()
 def normal_user_app(app):
     """配置普通用户鉴权的应用。"""
-    normal_user = _make_normal_user()
-    app.dependency_overrides[get_current_user] = lambda: normal_user
+    from src.core.exceptions import PermissionError as AppPermissionError
+
+    app.dependency_overrides[require_admin_or_api_key] = lambda: (_ for _ in ()).throw(AppPermissionError("权限不足"))
     yield app
     app.dependency_overrides.clear()
 
