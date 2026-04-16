@@ -267,6 +267,8 @@ class DataDownloader:
                 "download-data",
                 "--config",
                 str(config_path),
+                "--userdir",
+                str(temp_dir),
                 "--exchange",
                 _EXCHANGE_NAME,
                 "--pairs",
