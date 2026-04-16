@@ -138,6 +138,8 @@ def app(env_setup):
 @pytest.fixture()
 async def client(app, db_session: AsyncSession) -> AsyncClient:
     """使用真实数据库 session 的 HTTP 测试客户端。"""
+    from unittest.mock import AsyncMock, patch
+
     from src.core.deps import get_db
 
     async def override_get_db():
@@ -145,8 +147,9 @@ async def client(app, db_session: AsyncSession) -> AsyncClient:
 
     app.dependency_overrides[get_db] = override_get_db
 
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
-        yield ac
+    with patch("src.api.signals._check_paywall", new=AsyncMock(return_value=None)):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+            yield ac
 
     app.dependency_overrides.clear()
 
