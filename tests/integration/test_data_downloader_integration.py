@@ -25,7 +25,7 @@ def _write_ohlcv_fixture(datadir: Path, pair: str, timeframe: str, age_seconds: 
     """
     pair_normalized = pair.replace("/", "_")
     filename = f"{pair_normalized}-{timeframe}.feather"
-    file_path = datadir / filename
+    file_path = datadir / "binance" / filename
     file_path.parent.mkdir(parents=True, exist_ok=True)
 
     ts = pd.Timestamp(time.time() - age_seconds, unit="s", tz="UTC")

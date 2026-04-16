@@ -40,7 +40,7 @@ class TestDataFreshness:
         from src.freqtrade_bridge.data_downloader import DataDownloader
 
         # feather 路径：{datadir}/BTC_USDT-1d.feather
-        data_file = tmp_path / "BTC_USDT-1d.feather"
+        data_file = tmp_path / "binance" / "BTC_USDT-1d.feather"
 
         # 12 小时前的数据（在 1d 的 2x 容差内）
         now = datetime.datetime.now(tz=datetime.timezone.utc)
@@ -57,7 +57,7 @@ class TestDataFreshness:
 
         from src.freqtrade_bridge.data_downloader import DataDownloader
 
-        data_file = tmp_path / "BTC_USDT-1d.feather"
+        data_file = tmp_path / "binance" / "BTC_USDT-1d.feather"
 
         # 3 天前（超过 1d 的 2x 容差）
         now = datetime.datetime.now(tz=datetime.timezone.utc)
@@ -80,7 +80,8 @@ class TestDataFreshness:
         """文件内容损坏时，_is_data_fresh 返回 False（触发下载）。"""
         from src.freqtrade_bridge.data_downloader import DataDownloader
 
-        data_file = tmp_path / "BTC_USDT-1d.feather"
+        data_file = tmp_path / "binance" / "BTC_USDT-1d.feather"
+        data_file.parent.mkdir(parents=True, exist_ok=True)
         data_file.write_text("not_valid_feather{{{")
 
         downloader = DataDownloader()
@@ -91,7 +92,7 @@ class TestDataFreshness:
         """空 DataFrame 时，_is_data_fresh 返回 False。"""
         from src.freqtrade_bridge.data_downloader import DataDownloader
 
-        data_file = tmp_path / "BTC_USDT-1d.feather"
+        data_file = tmp_path / "binance" / "BTC_USDT-1d.feather"
         data_file.parent.mkdir(parents=True, exist_ok=True)
         pd.DataFrame().to_feather(data_file)
 
@@ -290,7 +291,7 @@ class TestDownloadMarketData:
         from src.freqtrade_bridge.exceptions import FreqtradeExecutionError
 
         # 创建过期的本地 feather（3 天前 → 触发下载尝试）
-        data_file = tmp_path / "BTC_USDT-1d.feather"
+        data_file = tmp_path / "binance" / "BTC_USDT-1d.feather"
         now = datetime.datetime.now(tz=datetime.timezone.utc)
         ts = (now - datetime.timedelta(days=3)).isoformat()
         _write_feather(data_file, ts)
@@ -331,7 +332,7 @@ class TestDownloadMarketData:
 
         from src.freqtrade_bridge.data_downloader import DataDownloader, DownloadResult
 
-        data_file = tmp_path / "BTC_USDT-1d.feather"
+        data_file = tmp_path / "binance" / "BTC_USDT-1d.feather"
 
         # 12 小时前（新鲜，在 1d × 2 容差内）
         now = datetime.datetime.now(tz=datetime.timezone.utc)

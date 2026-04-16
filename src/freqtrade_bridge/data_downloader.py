@@ -357,13 +357,15 @@ class DataDownloader:
     def _get_data_file_path(self, datadir: Path, pair: str, timeframe: str) -> Path:
         """获取 (pair, timeframe) 对应的 OHLCV 数据文件路径。
 
-        freqtrade 默认文件命名格式（spot feather）：
-          {datadir}/{pair_normalized}-{timeframe}.feather
-          例如：BTC/USDT → BTC_USDT-1d.feather
+        freqtrade CLI 默认布局（spot feather）：
+          {datadir}/{exchange}/{pair_normalized}-{timeframe}.feather
+          例如：BTC/USDT → binance/BTC_USDT-1d.feather
+        必须与 _run_download_subprocess 写入路径保持一致，否则新鲜度检查永远
+        命中不到，导致每小时都触发全量下载。
         """
         pair_normalized = pair.replace("/", "_")
         filename = f"{pair_normalized}-{timeframe}.feather"
-        return datadir / filename
+        return datadir / _EXCHANGE_NAME / filename
 
     @staticmethod
     def _timeframe_to_seconds(timeframe: str) -> float:
