@@ -347,6 +347,8 @@ class DataDownloader:
             },
             "telegram": {
                 "enabled": False,
+                "token": "disabled",
+                "chat_id": "0",
             },
             "api_server": {
                 "enabled": False,
