@@ -352,6 +352,10 @@ class DataDownloader:
             },
             "api_server": {
                 "enabled": False,
+                "listen_ip_address": "127.0.0.1",
+                "listen_port": 8080,
+                "username": "disabled",
+                "password": "disabled",  # pragma: allowlist secret
             },
             "datadir": str(datadir),
         }
