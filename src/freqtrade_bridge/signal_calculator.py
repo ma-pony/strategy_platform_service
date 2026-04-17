@@ -24,6 +24,11 @@ from src.freqtrade_bridge.exceptions import FreqtradeExecutionError
 
 logger = structlog.get_logger(__name__)
 
+# freqtrade CLI download-data 会将文件落在 {datadir}/{exchange}/ 子目录下，
+# 但 load_pair_history API 的 datadir 参数不会自动加该前缀。
+# 为和 DataDownloader 的写入路径对齐，此处读取时显式拼接 exchange 子目录。
+_EXCHANGE_NAME = "binance"
+
 if TYPE_CHECKING:
     import pandas as pd
     from sqlalchemy.orm import Session
@@ -248,7 +253,7 @@ class SignalCalculator:
         self._cache_misses += 1
 
         try:
-            df = load_pair_history(datadir=datadir, pair=pair, timeframe=timeframe)
+            df = load_pair_history(datadir=datadir / _EXCHANGE_NAME, pair=pair, timeframe=timeframe)
         except Exception as exc:
             raise FreqtradeExecutionError(f"加载 OHLCV 数据失败，pair: {pair}, timeframe: {timeframe}") from exc
 
